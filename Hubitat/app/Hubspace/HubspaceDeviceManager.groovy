@@ -5,120 +5,98 @@
  *  and structured similar to drivers in https://github.com/DaveGut/HubitatActive.
  */
 
-metadata {
-    definition(name: "Hubspace Device Manager", namespace: "community", author: "Codex") {
-        capability "Refresh"
-        capability "Initialize"
-        attribute "lastCheckin", "string"
-        command "listDevices"
-        command "turnOn", ["string"]
-        command "turnOff", ["string"]
+definition(
+  name: "HubSpace Bridge",
+  namespace: "neerpatel/hubspace",
+  author: "Neer Patel",
+  description: "Discover and control HubSpace devices via local bridge",
+  singleInstance: true
+)
+
+
+preferences {
+  page(name: "mainPage")
+}
+
+def mainPage() {
+  dynamicPage(name: "mainPage", title: "HubSpace Bridge", install: true, uninstall: true) {
+    section("Bridge") {
+      input "bridgeUrl", "text", title: "Bridge URL (e.g. http://pi:8123)", required: true
     }
-    preferences {
-        input name: "username", type: "string", title: "Hubspace Username", required: true
-        input name: "password", type: "password", title: "Hubspace Password", required: true
+    section("HubSpace Login (stored on bridge)") {
+      input "hsUser", "text", title: "Email", required: true
+      input "hsPass", "password", title: "Password", required: true
     }
-}
-
-void installed() {
-    log.info "Installed Hubspace Device Manager"
-    initialize()
-}
-
-void updated() {
-    log.info "Updated Hubspace Device Manager"
-    initialize()
-}
-
-void initialize() {
-    state.token = null
-    refresh()
-}
-
-void refresh() {
-    authenticate()
-    updateLastCheckin()
-}
-
-private void updateLastCheckin() {
-    sendEvent(name: "lastCheckin", value: new Date().toString())
-}
-
-private void authenticate() {
-    if (!username || !password) {
-        log.warn "Hubspace credentials not set"
-        return
+    section("Polling") {
+      input "pollSeconds", "number", title: "Poll interval (sec)", defaultValue: 30, required: true
     }
-    try {
-        def params = [
-            uri: "https://hubspaceconnect.com/api/auth/login",
-            contentType: "application/json",
-            body: ["username": username, "password": password]
-        ]
-        httpPost(params) { resp ->
-            if (resp.status == 200 && resp.data?.token) {
-                state.token = resp.data.token
-                log.debug "Obtained Hubspace auth token"
-            } else {
-                log.warn "Failed to authenticate to Hubspace"
-            }
-        }
-    } catch (Exception e) {
-        log.error "Hubspace authentication error: ${e.message}"
-    }
+  }
 }
 
-void listDevices() {
-    if (!state.token) {
-        log.warn "Not authenticated"
-        return
-    }
-    try {
-        def params = [
-            uri: "https://hubspaceconnect.com/api/devices",
-            headers: ["Authorization": "Bearer ${state.token}"],
-            contentType: "application/json"
-        ]
-        httpGet(params) { resp ->
-            if (resp.status == 200) {
-                log.info "Hubspace devices: ${resp.data}"
-            } else {
-                log.warn "Failed to fetch devices: ${resp.status}"
-            }
-        }
-    } catch (Exception e) {
-        log.error "Device list error: ${e.message}"
-    }
+def installed() { initialize() }
+def updated()  { unschedule(); initialize() }
+
+def initialize() {
+  loginToBridge()
+  discoverDevices()
+  schedule("*/${Math.max(15, pollSeconds)} * * * * ?", pollAll)
 }
 
-void turnOn(String deviceId) {
-    sendDeviceCommand(deviceId, true)
+private loginToBridge() {
+  httpPostJson([uri: "${bridgeUrl}/login",
+                body: [username: hsUser, password: hsPass],
+                timeout: 10]) { resp -> log.debug "Bridge login: ${resp.data}" }
 }
 
-void turnOff(String deviceId) {
-    sendDeviceCommand(deviceId, false)
+private discoverDevices() {
+  httpGet([uri: "${bridgeUrl}/devices", timeout: 10]) { resp ->
+    resp.data.each { d ->
+      def dni = "hubspace-${d.id}"
+      def typeName = driverForType(d.type)   // map to child driver name
+      def child = getChildDevice(dni) ?: addChildDevice("neer/hubspace", typeName, dni,
+                      [label: d.name, isComponent: false])
+      child?.sendEvent(name: "deviceNetworkId", value: d.id)
+      child?.updateDataValue("hsType", d.type as String)
+    }
+  }
 }
 
-private void sendDeviceCommand(String deviceId, Boolean powerState) {
-    if (!state.token) {
-        log.warn "Not authenticated"
-        return
-    }
-    try {
-        def params = [
-            uri: "https://hubspaceconnect.com/api/device/${deviceId}/state",
-            headers: ["Authorization": "Bearer ${state.token}"],
-            contentType: "application/json",
-            body: ["power": powerState]
-        ]
-        httpPost(params) { resp ->
-            if (resp.status == 200) {
-                log.info "Device ${deviceId} power set to ${powerState}"
-            } else {
-                log.warn "Failed to control device: ${resp.status}"
-            }
-        }
-    } catch (Exception e) {
-        log.error "Device command error: ${e.message}"
-    }
+def pollAll() {
+  getChildDevices()?.each { c -> pollChild(c) }
+}
+
+def pollChild(cd) {
+  def devId = cd.deviceNetworkId - "hubspace-"
+  httpGet([uri: "${bridgeUrl}/state/${devId}", timeout: 10]) { resp ->
+    updateFromState(cd, resp.data)
+  }
+}
+
+private updateFromState(cd, Map state) {
+  // normalize into Hubitat attributes (switch, level, colorTemperature, fanSpeed, lock, thermostatOperatingState...)
+  if(state.switch != null) cd.sendEvent(name:"switch", value: state.switch ? "on" : "off")
+  if(state.brightness != null) cd.sendEvent(name:"level", value: (state.brightness as int))
+  if(state.color_temp != null) cd.sendEvent(name:"colorTemperature", value: (state.color_temp as int))
+  if(state.fan_speed != null) cd.sendEvent(name:"speed", value: (state.fan_speed as String))
+  if(state.lock != null) cd.sendEvent(name:"lock", value: state.lock ? "locked" : "unlocked")
+  // ...extend per device type
+}
+
+String driverForType(String t) {
+  switch(t) {
+    case "light": return "HubSpace Light (LAN)"
+    case "switch": return "HubSpace Switch (LAN)"
+    case "fan": return "HubSpace Fan (LAN)"
+    case "lock": return "HubSpace Lock (LAN)"
+    case "thermostat": return "HubSpace Thermostat (LAN)"
+    case "valve": return "HubSpace Valve (LAN)"
+    default: return "HubSpace Device (LAN)"
+  }
+}
+
+// Called by child driver commands
+def sendHsCommand(String devId, String cmd, Map args=[:]) {
+  httpPostJson([uri: "${bridgeUrl}/command/${devId}", body: [cmd: cmd, args: args], timeout: 10]) { resp ->
+    if(!resp.data?.ok) log.warn "Command failed: $cmd $args -> ${resp.data}"
+  }
 }
