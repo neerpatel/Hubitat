@@ -24,20 +24,20 @@ preferences {
 }
 
 def mainPage() {
-  dynamicPage(name: "mainPage", title: "HubSpace Bridge", install: true, uninstall: true) {
-    section() {
+  dynamicPage(name: "mainPage", title: "HubSpace Device Manager", install: true, uninstall: true) {
+    section("HubSpace Credentials") {
       if (!state.accessToken) {
-        paragraph "To begin, you must authorize your Hubspace account with Hubitat."
-        href(
-          name: "oauth",
-          title: "Connect to Hubspace",
-          description: "Click here to log in to your Hubspace account and authorize Hubitat.",
-          required: true,
-          url: getAuthUrl()
-        )
+        paragraph "Enter your HubSpace username and password to authenticate."
+        input "username", "text", title: "HubSpace Username/Email", required: true
+        input "password", "password", title: "HubSpace Password", required: true
+        input name: "authenticate", type: "button", title: "Connect to HubSpace"
       } else {
         paragraph "✅ Connected to HubSpace successfully!"
-        paragraph "Last token refresh: ${state.tokenExpires ? new Date(state.tokenExpires) : 'Never'}"
+        paragraph "Token expires: ${state.tokenExpires ? new Date(state.tokenExpires) : 'Unknown'}"
+        if (state.accountId) {
+          paragraph "Account ID: ${state.accountId}"
+        }
+        input name: "refreshToken", type: "button", title: "Refresh Token"
         input name: "disconnectNow", type: "button", title: "Disconnect from HubSpace"
       }
     }
@@ -46,6 +46,9 @@ def mainPage() {
     }
     section("Actions") {
       input name: "discoverNow", type: "button", title: "Discover Devices Now"
+      if (getChildDevices()?.size() > 0) {
+        paragraph "Discovered devices: ${getChildDevices().size()}"
+      }
     }
   }
 }
@@ -64,23 +67,19 @@ void appButtonHandler(String btn) {
     state.tokenExpires = null
     state.accountId = null
     log.info "Disconnected from HubSpace"
-  } else if (btn == "saveToken") {
-    log.debug "HubSpace Bridge: save token requested"
-    if (settings.accessToken) {
-      state.accessToken = settings.accessToken
-      state.tokenExpires = now() + (24 * 60 * 60 * 1000) // Assume 24hr expiry
-      log.info "Access token saved successfully"
-      // Test the token by trying to get account info
-      try {
-        getAccountId()
-        log.info "Token validated - account ID retrieved: ${state.accountId}"
-        discoverDevices()
-      } catch (Exception e) {
-        log.error "Token validation failed: ${e.message}"
-        state.accessToken = null
-      }
+  } else if (btn == "authenticate") {
+    log.debug "HubSpace Bridge: authentication requested"
+    if (settings.username && settings.password) {
+      performWebAppLogin()
     } else {
-      log.warn "No access token provided"
+      log.warn "Username and password are required"
+    }
+  } else if (btn == "refreshToken") {
+    log.debug "HubSpace Bridge: token refresh requested"
+    if (state.refreshToken) {
+      refreshAccessToken()
+    } else {
+      log.warn "No refresh token available. Please re-authenticate."
     }
   }
 }
@@ -91,39 +90,273 @@ def updated()  { unschedule(); initialize() }
 def initialize() {
   log.debug "Initializing HubspaceDeviceManager"
   if (!state.accessToken) {
-    log.info "Access token not found. Please enter your HubSpace access token in the app settings."
+    log.info "Access token not found. Please authenticate with your HubSpace credentials."
     return
   }
   discoverDevices()
   if (state.knownIds == null) state.knownIds = []
   schedule("*/${Math.max(15, pollSeconds)} * * * * ?", pollAll)
 }
-private getAuthUrl() {
-  log.debug "getAuthUrl()"
-  state.redirectUri = "https://cloud.hubitat.com/oauth/st-callback"
-  def authUrl = "https://accounts.hubspaceconnect.com/auth/realms/thd/protocol/openid-connect/auth?" +
-                "response_type=code&" +
-                "client_id=hubspace_android&" +
-                "redirect_uri=${state.redirectUri}&" +
-                "scope=openid%20offline_access"
-  log.debug "Auth URL: ${authUrl}"
-  return authUrl
+
+private performWebAppLogin() {
+  log.debug "Starting HubSpace authentication flow"
+  try {
+    // Generate PKCE challenge
+    def challenge = generateChallengeData()
+    
+    // Step 1: Get the authorization page to extract session info
+    def authUrl = generateAuthUrl("/protocol/openid-connect/auth")
+    def codeParams = [
+      "response_type": "code",
+      "client_id": "hubspace_android",
+      "redirect_uri": "hubspace-app://loginredirect",
+      "scope": "openid offline_access",
+      "code_challenge": challenge.challenge,
+      "code_challenge_method": "S256"
+    ]
+    
+    log.debug "Getting auth page: ${authUrl} with params: ${codeParams}"
+    
+    httpGet([
+      uri: authUrl,
+      query: codeParams,
+      followRedirects: false,
+      textParser: false,
+      timeout: 20
+    ]) { resp ->
+      if (resp.status != 200) {
+        throw new Exception("Failed to get auth page: ${resp.status}")
+      }
+      
+      // Parse the HTML to extract hidden form fields
+      def html = resp.data.toString()
+      log.debug "resp properties: ${resp?.properties?.keySet()}" // headers, class, entity, status, contentType, locale, allHeaders, params, data, context, success, statusLine, protocolVersion
+      log.debug "Received auth page HTML: ${resp.contentType}"
+      log.debug "Received auth page HTML: ${html}"
+      def sessionCode = extractFromHtml(html, 'name="session_code" value="([^"]*)"')
+      def execution = extractFromHtml(html, 'name="execution" value="([^"]*)"')
+      def tabId = extractFromHtml(html, 'name="tab_id" value="([^"]*)"')
+      log.debug "Extracted auth page parameters: sessionCode=${sessionCode}, execution=${execution}, tabId=${tabId}"
+      if (!sessionCode || !execution || !tabId) {
+        throw new Exception("Failed to extract session parameters from auth page")
+      }
+      
+      //log.debug "Extracted session parameters: sessionCode=${sessionCode}, execution=${execution}, tabId=${tabId}"
+      
+      // Step 2: Submit login credentials
+      submitLoginCredentials(sessionCode, execution, tabId, challenge)
+    }
+  } catch (Exception e) {
+    log.error "Authentication failed: ${e.message}"
+    state.accessToken = null
+  }
 }
+
+private generateChallengeData() {
+  log.debug "Generating PKCE challenge data"
+  
+  // Generate code verifier - 40 random bytes, base64url encoded
+  def random = new Random()
+  def bytes = new byte[40]
+  random.nextBytes(bytes)
+  
+  def codeVerifier = bytes.encodeBase64().toString()
+    .replace('+', '-')
+    .replace('/', '_')
+    .replaceAll('[^a-zA-Z0-9\\-_]', '')
+  
+  // Generate code challenge - SHA256 hash of verifier, base64url encoded
+  def digest = java.security.MessageDigest.getInstance("SHA-256")
+  def hash = digest.digest(codeVerifier.getBytes("UTF-8"))
+  
+  def codeChallenge = hash.encodeBase64().toString()
+    .replace('+', '-')
+    .replace('/', '_')
+    .replace('=', '')
+  
+  log.debug "Generated PKCE challenge: verifier length=${codeVerifier.length()}, challenge length=${codeChallenge.length()}"
+  
+  return [
+    challenge: codeChallenge,
+    verifier: codeVerifier
+  ]
+}
+
+private submitLoginCredentials(String sessionCode, String execution, String tabId, Map challenge) {
+  def loginUrl = generateAuthUrl("/login-actions/authenticate")
+  def loginData = [
+    "username": settings.username,
+    "password": settings.password,
+    "credentialId": "",
+    "session_code": sessionCode,
+    "execution": execution,
+    "tab_id": tabId
+  ]
+  
+  def headers = [
+    "Content-Type": "application/x-www-form-urlencoded",
+    "User-Agent": "Dart/2.15 (dart:io)"
+  ]
+  
+  log.debug "Submitting login credentials to: ${loginUrl}"
+  
+  httpPost([
+    uri: loginUrl,
+    body: loginData,
+    headers: headers,
+    timeout: 20
+  ]) { resp ->
+    if (resp.status == 302 || resp.status == 200) {
+      // Check for redirect with authorization code
+      def location = resp.headers["Location"]?.value
+      if (location && location.contains("code=")) {
+        def code = extractAuthCode(location)
+        if (code) {
+          log.debug "Successfully extracted authorization code"
+          exchangeCodeForToken(code, challenge)
+        } else {
+          throw new Exception("Failed to extract authorization code from redirect")
+        }
+      } else {
+        throw new Exception("No authorization code in response")
+      }
+    } else {
+      throw new Exception("Login failed with status: ${resp.status}")
+    }
+  }
+}
+
+private exchangeCodeForToken(String code, Map challenge) {
+  def tokenUrl = generateAuthUrl("/protocol/openid-connect/token")
+  def tokenData = [
+    "grant_type": "authorization_code",
+    "client_id": "hubspace_android",
+    "redirect_uri": "hubspace-app://loginredirect",
+    "code": code,
+    "code_verifier": challenge.verifier
+  ]
+  
+  def headers = [
+    "Content-Type": "application/x-www-form-urlencoded",
+    "User-Agent": "Dart/2.15 (dart:io)"
+  ]
+  
+  log.debug "Exchanging code for token at: ${tokenUrl}"
+  
+  httpPost([
+    uri: tokenUrl,
+    body: tokenData,
+    headers: headers,
+    timeout: 20
+  ]) { resp ->
+    if (resp.status == 200) {
+      def tokenResponse = resp.data
+      state.accessToken = tokenResponse.access_token
+      state.refreshToken = tokenResponse.refresh_token
+      state.tokenExpires = now() + (tokenResponse.expires_in * 1000)
+      
+      log.info "Successfully obtained access token, expires in ${tokenResponse.expires_in} seconds"
+      
+      // Test the token and discover devices
+      getAccountId()
+      discoverDevices()
+    } else {
+      throw new Exception("Token exchange failed with status: ${resp.status}")
+    }
+  }
+}
+
+private refreshAccessToken() {
+  if (!state.refreshToken) {
+    log.warn "No refresh token available"
+    return false
+  }
+  
+  def tokenUrl = generateAuthUrl("/protocol/openid-connect/token")
+  def tokenData = [
+    "grant_type": "refresh_token",
+    "client_id": "hubspace_android",
+    "refresh_token": state.refreshToken
+  ]
+  
+  def headers = [
+    "Content-Type": "application/x-www-form-urlencoded",
+    "User-Agent": "Dart/2.15 (dart:io)"
+  ]
+  
+  log.debug "Refreshing access token"
+  
+  try {
+    httpPost([
+      uri: tokenUrl,
+      body: tokenData,
+      headers: headers,
+      timeout: 20
+    ]) { resp ->
+      if (resp.status == 200) {
+        def tokenResponse = resp.data
+        state.accessToken = tokenResponse.access_token
+        if (tokenResponse.refresh_token) {
+          state.refreshToken = tokenResponse.refresh_token
+        }
+        state.tokenExpires = now() + (tokenResponse.expires_in * 1000)
+        
+        log.info "Successfully refreshed access token"
+        return true
+      } else {
+        throw new Exception("Token refresh failed with status: ${resp.status}")
+      }
+    }
+  } catch (Exception e) {
+    log.error "Error refreshing token: ${e.message}"
+    state.accessToken = null
+    state.refreshToken = null
+    return false
+  }
+}
+
+private generateAuthUrl(String endpoint) {
+  endpoint = endpoint.startsWith("/") ? endpoint.substring(1) : endpoint
+  return "https://accounts.hubspaceconnect.com/auth/realms/thd/${endpoint}"
+}
+
+private extractFromHtml(String html, String pattern) {
+  def matcher = html =~ pattern
+  return matcher ? matcher[0][1] : null
+}
+
+private extractAuthCode(String url) {
+  def matcher = url =~ /code=([^&]*)/
+  return matcher ? java.net.URLDecoder.decode(matcher[0][1], "UTF-8") : null
+}
+
 private discoverDevices() {
   refreshIndexAndDiscover()
 }
 
 
 def pollAll() {
-  checkAndRenewToken()
+  if (!checkAndRenewToken()) {
+    log.warn "Cannot poll devices - no valid access token"
+    return
+  }
   getChildDevices()?.each { c -> pollChild(c) }
 }
 
 def pollChild(cd) {
   def devId = cd.deviceNetworkId - "hubspace-"
-  checkAndRenewToken()
+  if (!checkAndRenewToken()) return
+  
   try {
-    httpGet([uri: "https://api2.afero.net/v1/accounts/${state.accountId}/metadevices/${devId}/state", headers: ["Authorization": "Bearer ${state.accessToken}"], timeout: 10]) { resp ->
+    def url = generateApiUrl("/v1/accounts/${state.accountId}/metadevices/${devId}/state")
+    httpGet([
+      uri: url, 
+      headers: [
+        "Authorization": "Bearer ${state.accessToken}",
+        "Host": "api2.afero.net"
+      ], 
+      timeout: 10
+    ]) { resp ->
       updateFromState(cd, resp.data)
     }
   } catch (Exception e) {
@@ -152,7 +385,8 @@ String driverForType(String t) {
 
 // Called by child driver commands
 def sendHsCommand(String devId, String cmd, Map args=[:]) {
-  checkAndRenewToken()
+  if (!checkAndRenewToken()) return
+  
   def payload = [
     metadeviceId: devId,
     values: [
@@ -165,7 +399,17 @@ def sendHsCommand(String devId, String cmd, Map args=[:]) {
   ]
   
   try {
-    httpPutJson([uri: "https://api2.afero.net/v1/accounts/${state.accountId}/metadevices/${devId}/state", headers: ["Authorization": "Bearer ${state.accessToken}"], body: payload, timeout: 10]) { resp ->
+    def url = generateApiUrl("/v1/accounts/${state.accountId}/metadevices/${devId}/state")
+    httpPutJson([
+      uri: url, 
+      headers: [
+        "Authorization": "Bearer ${state.accessToken}",
+        "Host": "api2.afero.net",
+        "Content-Type": "application/json; charset=utf-8"
+      ], 
+      body: payload, 
+      timeout: 10
+    ]) { resp ->
       if(resp.status != 200) {
         log.warn "Command failed: $cmd $args -> ${resp.data}"
       } else {
@@ -182,20 +426,59 @@ def sendHsCommand(String devId, String cmd, Map args=[:]) {
   }
 }
 
+private generateApiUrl(String endpoint) {
+  endpoint = endpoint.startsWith("/") ? endpoint.substring(1) : endpoint
+  return "https://api2.afero.net/${endpoint}"
+}
+
 private getAccountId() {
   if (!state.accountId) {
-    checkAndRenewToken()
-    httpGet([uri: "https://api2.afero.net/v1/users/me", headers: ["Authorization": "Bearer ${state.accessToken}"], timeout: 10]) { resp ->
-      state.accountId = resp.data.accountAccess[0].account.accountId
-      log.debug "Retrieved account ID: ${state.accountId}"
+    if (!checkAndRenewToken()) return
+    
+    try {
+      def url = generateApiUrl("/v1/users/me")
+      httpGet([
+        uri: url, 
+        headers: [
+          "Authorization": "Bearer ${state.accessToken}",
+          "Host": "api2.afero.net"
+        ], 
+        timeout: 10
+      ]) { resp ->
+        resp.raise_for_status()
+        def jsonData = resp.data
+        if (!jsonData?.accountAccess || jsonData.accountAccess.size() == 0) {
+          throw new Exception("No account ID found")
+        }
+        state.accountId = jsonData.accountAccess[0].account.accountId
+        log.debug "Retrieved account ID: ${state.accountId}"
+      }
+    } catch (Exception e) {
+      log.error "Error retrieving account ID: ${e.message}"
+      throw e
     }
   }
 }
 
 private checkAndRenewToken() {
-  if (state.accessToken && state.tokenExpires && now() >= state.tokenExpires) {
-    oauthRenew()
+  if (!state.accessToken) {
+    log.warn "No access token available. Please authenticate with your HubSpace credentials."
+    return false
   }
+  
+  // Check if token is expired and try to refresh
+  if (state.tokenExpires && now() >= state.tokenExpires) {
+    log.info "Access token expired, attempting to refresh"
+    if (refreshAccessToken()) {
+      log.info "Token refreshed successfully"
+      return true
+    } else {
+      log.warn "Token refresh failed. Please re-authenticate."
+      return false
+    }
+  }
+  
+  return true
 }
 
 void refreshIndexAndDiscover() {
@@ -206,8 +489,18 @@ void refreshIndexAndDiscover() {
   // Get all devices from Hubspace API
   List allDevices = []
   try {
-    checkAndRenewToken()
-    httpGet([uri: "https://api2.afero.net/v1/accounts/${state.accountId}/metadevices", headers: ["Authorization": "Bearer ${state.accessToken}"], timeout: 15]) { resp ->
+    if (!checkAndRenewToken()) return
+    
+    def url = generateApiUrl("/v1/accounts/${state.accountId}/metadevices")
+    httpGet([
+      uri: url, 
+      headers: [
+        "Authorization": "Bearer ${state.accessToken}",
+        "Host": "api2.afero.net"
+      ], 
+      params: ["expansions": "state"],
+      timeout: 15
+    ]) { resp ->
       allDevices = resp?.data as List
     }
   } catch (Throwable t) {
