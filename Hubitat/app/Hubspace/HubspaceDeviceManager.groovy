@@ -24,21 +24,20 @@ preferences {
 }
 
 def mainPage() {
-  dynamicPage(name: "mainPage", title: "HubSpace Device Manager", install: true, uninstall: true) {
-    section("HubSpace Authentication") {
+  dynamicPage(name: "mainPage", title: "HubSpace Bridge", install: true, uninstall: true) {
+    section() {
       if (!state.accessToken) {
-        paragraph "To connect to HubSpace, you need to obtain an access token from the HubSpace mobile app or browser."
-        paragraph "Instructions:"
-        paragraph "1. Log into HubSpace in your browser"
-        paragraph "2. Open browser developer tools (F12)"
-        paragraph "3. Go to Network tab, then reload the page"
-        paragraph "4. Look for requests to 'api2.afero.net'"
-        paragraph "5. Copy the 'Authorization: Bearer <token>' header value"
-        input "accessToken", "text", title: "Access Token", description: "Paste your HubSpace access token here", required: false
-        input name: "saveToken", type: "button", title: "Save Token"
+        paragraph "To begin, you must authorize your Hubspace account with Hubitat."
+        href(
+          name: "oauth",
+          title: "Connect to Hubspace",
+          description: "Click here to log in to your Hubspace account and authorize Hubitat.",
+          required: true,
+          url: getAuthUrl()
+        )
       } else {
         paragraph "✅ Connected to HubSpace successfully!"
-        paragraph "Token status: ${state.tokenExpires && now() < state.tokenExpires ? 'Valid' : 'Expired/Unknown'}"
+        paragraph "Last token refresh: ${state.tokenExpires ? new Date(state.tokenExpires) : 'Never'}"
         input name: "disconnectNow", type: "button", title: "Disconnect from HubSpace"
       }
     }
@@ -99,7 +98,17 @@ def initialize() {
   if (state.knownIds == null) state.knownIds = []
   schedule("*/${Math.max(15, pollSeconds)} * * * * ?", pollAll)
 }
-
+private getAuthUrl() {
+  log.debug "getAuthUrl()"
+  state.redirectUri = "https://cloud.hubitat.com/oauth/st-callback"
+  def authUrl = "https://accounts.hubspaceconnect.com/auth/realms/thd/protocol/openid-connect/auth?" +
+                "response_type=code&" +
+                "client_id=hubspace_android&" +
+                "redirect_uri=${state.redirectUri}&" +
+                "scope=openid%20offline_access"
+  log.debug "Auth URL: ${authUrl}"
+  return authUrl
+}
 private discoverDevices() {
   refreshIndexAndDiscover()
 }
