@@ -6,35 +6,71 @@ metadata {
     capability "ColorTemperature"
     capability "Color Control"
     capability "Refresh"
+    capability "PresenceSensor"
   }
   preferences {
     input name: "transitionMs", type: "number", title: "Fade (ms)", defaultValue: 300
   }
 }
-def initialize() {}
-def refresh() { parent.pollChild(device) }
-def on()  { parent.sendHsCommand(id(), "power", [value: "on"]) }
-def off() { parent.sendHsCommand(id(), "power", [value: "off"]) }
+
+def initialize() {
+  log.debug "Initializing HubSpace Light"
+}
+
+def refresh() { 
+  parent.pollChild(device) 
+}
+
+def on() { 
+  log.info "Turning on ${device.displayName}"
+  parent.sendHsCommand(id(), "power", [value: "on"]) 
+}
+
+def off() { 
+  log.info "Turning off ${device.displayName}"
+  parent.sendHsCommand(id(), "power", [value: "off"]) 
+}
+
 def setLevel(v, dur=null) {
+  log.info "Setting level to ${v} for ${device.displayName}"
   parent.sendHsCommand(id(), "brightness", [value: v as int])
 }
+
 def setColorTemperature(kelvin) {
+  log.info "Setting color temperature to ${kelvin}K for ${device.displayName}"
   parent.sendHsCommand(id(), "color-temperature", [value: kelvin as int])
 }
+
 def setColor(value) {
-  // value is a map like [hue:0-99, saturation:0-99, colorName:"Red", hex:"#FF0000"]
-  // Hubspace API expects RGB values (0-255)
+  log.info "Setting color for ${device.displayName}: ${value}"
+  // value is a map like [hue:0-99, saturation:0-99, level:0-100]
   def rgb = hubitatColorToRgb(value)
   parent.sendHsCommand(id(), "color-rgb", [value: [r: rgb.r, g: rgb.g, b: rgb.b]])
+  
+  // Also set level if provided
+  if (value.level != null) {
+    setLevel(value.level)
+  }
+}
+
+def setHue(hue) {
+  def currentColor = [hue: hue, saturation: device.currentValue("saturation") ?: 100]
+  setColor(currentColor)
+}
+
+def setSaturation(saturation) {
+  def currentColor = [hue: device.currentValue("hue") ?: 0, saturation: saturation]
+  setColor(currentColor)
 }
 
 private Map hubitatColorToRgb(Map color) {
-  def hue = color.hue
-  def saturation = color.saturation
+  def hue = color.hue ?: 0
+  def saturation = color.saturation ?: 100
+  def level = color.level ?: device.currentValue("level") ?: 100
 
   def h = hue * 3.6 // Convert to 0-360
   def s = saturation / 100.0 // Convert to 0-1
-  def v = 1.0 // Assume full brightness for now
+  def v = level / 100.0 // Convert to 0-1
 
   def r, g, b
 
@@ -60,4 +96,6 @@ private Map hubitatColorToRgb(Map color) {
   ]
 }
 
-private id(){ device.deviceNetworkId - "hubspace-" }
+private id() { 
+  device.deviceNetworkId - "hubspace-" 
+}

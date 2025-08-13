@@ -6,8 +6,8 @@
  */
 
 
-defdefinition(
-  name: "HubSpace Bridge",
+definition(
+  name: "HubSpace Device Manager",
   namespace: "neerpatel/hubspace",
   author: "Neer Patel",
   importUrl: "https://raw.githubusercontent.com/neerpatel/hubspace/main/Hubitat/app/Hubspace/HubspaceDeviceManager.groovy", 
@@ -15,19 +15,7 @@ defdefinition(
   iconUrl: "",
   iconX2Url: "",
   installOnOpen: true,
-  singleInstance: true,
-  oauth: [
-    name: "Hubspace",
-    url: "https://accounts.hubspaceconnect.com/auth/realms/thd/protocol/openid-connect/auth",
-    clientId: "hubspace_android",
-    clientSecret: "",
-    scope: "openid offline_access",
-    responseType: "code",
-    grantType: "authorization_code",
-    accessTokenUrl: "https://accounts.hubspaceconnect.com/auth/realms/thd/protocol/openid-connect/token",
-    refreshTokenUrl: "https://accounts.hubspaceconnect.com/auth/realms/thd/protocol/openid-connect/token",
-    redirectUrl: "https://cloud.hubitat.com/oauth/st-callback"
-  ]
+  singleInstance: true
 )
 
 
@@ -36,16 +24,23 @@ preferences {
 }
 
 def mainPage() {
-  dynamicPage(name: "mainPage", title: "HubSpace Bridge", install: true, uninstall: true) {
-    section() {
-      paragraph "To begin, you must authorize your Hubspace account with Hubitat."
-      href(
-        name: "oauth",
-        title: "Connect to Hubspace",
-        description: "Click here to log in to your Hubspace account and authorize Hubitat.",
-        required: true,
-        page: "oauthInitUrl"
-      )
+  dynamicPage(name: "mainPage", title: "HubSpace Device Manager", install: true, uninstall: true) {
+    section("HubSpace Authentication") {
+      if (!state.accessToken) {
+        paragraph "To connect to HubSpace, you need to obtain an access token from the HubSpace mobile app or browser."
+        paragraph "Instructions:"
+        paragraph "1. Log into HubSpace in your browser"
+        paragraph "2. Open browser developer tools (F12)"
+        paragraph "3. Go to Network tab, then reload the page"
+        paragraph "4. Look for requests to 'api2.afero.net'"
+        paragraph "5. Copy the 'Authorization: Bearer <token>' header value"
+        input "accessToken", "text", title: "Access Token", description: "Paste your HubSpace access token here", required: false
+        input name: "saveToken", type: "button", title: "Save Token"
+      } else {
+        paragraph "✅ Connected to HubSpace successfully!"
+        paragraph "Token status: ${state.tokenExpires && now() < state.tokenExpires ? 'Valid' : 'Expired/Unknown'}"
+        input name: "disconnectNow", type: "button", title: "Disconnect from HubSpace"
+      }
     }
     section("Polling") {
       input "pollSeconds", "number", title: "Poll interval (sec)", defaultValue: 30, required: true
@@ -63,6 +58,31 @@ void appButtonHandler(String btn) {
   if (btn == "discoverNow") {
     log.debug "HubSpace Bridge: manual discovery requested"
     refreshIndexAndDiscover()
+  } else if (btn == "disconnectNow") {
+    log.debug "HubSpace Bridge: disconnect requested"
+    state.accessToken = null
+    state.refreshToken = null
+    state.tokenExpires = null
+    state.accountId = null
+    log.info "Disconnected from HubSpace"
+  } else if (btn == "saveToken") {
+    log.debug "HubSpace Bridge: save token requested"
+    if (settings.accessToken) {
+      state.accessToken = settings.accessToken
+      state.tokenExpires = now() + (24 * 60 * 60 * 1000) // Assume 24hr expiry
+      log.info "Access token saved successfully"
+      // Test the token by trying to get account info
+      try {
+        getAccountId()
+        log.info "Token validated - account ID retrieved: ${state.accountId}"
+        discoverDevices()
+      } catch (Exception e) {
+        log.error "Token validation failed: ${e.message}"
+        state.accessToken = null
+      }
+    } else {
+      log.warn "No access token provided"
+    }
   }
 }
 
@@ -72,80 +92,12 @@ def updated()  { unschedule(); initialize() }
 def initialize() {
   log.debug "Initializing HubspaceDeviceManager"
   if (!state.accessToken) {
-    log.info "Access token not found. Please authorize Hubitat with your Hubspace account."
+    log.info "Access token not found. Please enter your HubSpace access token in the app settings."
     return
   }
   discoverDevices()
   if (state.knownIds == null) state.knownIds = []
   schedule("*/${Math.max(15, pollSeconds)} * * * * ?", pollAll)
-}
-
-def oauthInitUrl() {
-  log.debug "oauthInitUrl()"
-  state.redirectUri = "https://cloud.hubitat.com/oauth/st-callback"
-  def authUrl = "https://accounts.hubspaceconnect.com/auth/realms/thd/protocol/openid-connect/auth?" +
-                "response_type=code&" +
-                "client_id=hubspace_android&" +
-                "redirect_uri=${state.redirectUri}&" +
-                "scope=openid%20offline_access"
-  log.debug "Auth URL: ${authUrl}"
-  return authUrl
-}
-
-def oauthCallback(params) {
-  log.debug "oauthCallback(${params})"
-  def code = params.code
-  def accessTokenUrl = "https://accounts.hubspaceconnect.com/auth/realms/thd/protocol/openid-connect/token"
-  def body = [
-    grant_type: "authorization_code",
-    client_id: "hubspace_android",
-    redirect_uri: state.redirectUri,
-    code: code
-  ]
-
-  try {
-    httpPostJson(
-      uri: accessTokenUrl,
-      body: body,
-      timeout: 20
-    ) { resp ->
-      log.debug "OAuth Callback Response: ${resp.data}"
-      state.accessToken = resp.data.access_token
-      state.refreshToken = resp.data.refresh_token
-      state.tokenExpires = now() + (resp.data.expires_in * 1000)
-      log.info "Successfully obtained access token."
-      discoverDevices()
-    }
-  } catch (e) {
-    log.error "Error during OAuth callback: ${e.message}"
-  }
-}
-
-def oauthRenew() {
-  log.debug "oauthRenew()"
-  def refreshTokenUrl = "https://accounts.hubspaceconnect.com/auth/realms/thd/protocol/openid-connect/token"
-  def body = [
-    grant_type: "refresh_token",
-    client_id: "hubspace_android",
-    refresh_token: state.refreshToken
-  ]
-
-  try {
-    httpPostJson(
-      uri: refreshTokenUrl,
-      body: body,
-      timeout: 20
-    ) { resp ->
-      log.debug "OAuth Renew Response: ${resp.data}"
-      state.accessToken = resp.data.access_token
-      state.refreshToken = resp.data.refresh_token
-      state.tokenExpires = now() + (resp.data.expires_in * 1000)
-      log.info "Successfully renewed access token."
-    }
-  } catch (e) {
-    log.error "Error during OAuth renew: ${e.message}"
-    state.accessToken = null // Invalidate token to force re-auth
-  }
 }
 
 private discoverDevices() {
@@ -161,31 +113,31 @@ def pollAll() {
 def pollChild(cd) {
   def devId = cd.deviceNetworkId - "hubspace-"
   checkAndRenewToken()
-  httpGet([uri: "https://api2.afero.net/v1/accounts/${state.accountId}/metadevices/${devId}/state", headers: ["Authorization": "Bearer ${state.accessToken}"], timeout: 10]) { resp ->
-    updateFromState(cd, resp.data)
+  try {
+    httpGet([uri: "https://api2.afero.net/v1/accounts/${state.accountId}/metadevices/${devId}/state", headers: ["Authorization": "Bearer ${state.accessToken}"], timeout: 10]) { resp ->
+      updateFromState(cd, resp.data)
+    }
+  } catch (Exception e) {
+    log.warn "Error polling device ${cd.displayName}: ${e.message}"
   }
-}
-
-private updateFromState(cd, Map state) {
-  // normalize into Hubitat attributes (switch, level, colorTemperature, fanSpeed, lock, thermostatOperatingState...)
-  if(state.switch != null) cd.sendEvent(name:"switch", value: state.switch ? "on" : "off")
-  if(state.brightness != null) cd.sendEvent(name:"level", value: (state.brightness as int))
-  if(state.color_temp != null) cd.sendEvent(name:"colorTemperature", value: (state.color_temp as int))
-  if(state.fan_speed != null) cd.sendEvent(name:"speed", value: (state.fan_speed as String))
-  if(state.lock != null) cd.sendEvent(name:"lock", value: state.lock ? "locked" : "unlocked")
-  // ...extend per device type
 }
 
 String driverForType(String t) {
   switch(t) {
-    case "light": return "HubSpace Light (LAN)"
-    case "switch": return "HubSpace Switch (LAN)"
-    case "fan": return "HubSpace Fan (LAN)"
-    case "exhaust-fan": return "HubSpace Exhaust Fan (LAN)"
-    case "lock": return "HubSpace Lock (LAN)"
-    case "thermostat": return "HubSpace Thermostat (LAN)"
-    case "valve": return "HubSpace Valve (LAN)"
-    default: return "HubSpace Device (LAN)"
+    case "light": return "HubSpace Light"
+    case "switch": return "HubSpace Switch"
+    case "fan": return "HubSpace Fan"
+    case "ceiling-fan": return "HubSpace Fan"
+    case "exhaust-fan": return "HubSpace Exhaust Fan"
+    case "lock": return "HubSpace Lock"
+    case "door-lock": return "HubSpace Lock"
+    case "thermostat": return "HubSpace Thermostat"
+    case "portable-air-conditioner": return "HubSpace Portable AC"
+    case "valve": return "HubSpace Valve"
+    case "water-timer": return "HubSpace Valve"
+    case "security-system": return "HubSpace Security System"
+    case "security-system-sensor": return "HubSpace Security System Sensor"
+    default: return "HubSpace Device"
   }
 }
 
@@ -202,8 +154,22 @@ def sendHsCommand(String devId, String cmd, Map args=[:]) {
       ]
     ]
   ]
-  httpPutJson([uri: "https://api2.afero.net/v1/accounts/${state.accountId}/metadevices/${devId}/state", headers: ["Authorization": "Bearer ${state.accessToken}"], body: payload, timeout: 10]) { resp ->
-    if(resp.status != 200) log.warn "Command failed: $cmd $args -> ${resp.data}"
+  
+  try {
+    httpPutJson([uri: "https://api2.afero.net/v1/accounts/${state.accountId}/metadevices/${devId}/state", headers: ["Authorization": "Bearer ${state.accessToken}"], body: payload, timeout: 10]) { resp ->
+      if(resp.status != 200) {
+        log.warn "Command failed: $cmd $args -> ${resp.data}"
+      } else {
+        log.debug "Command successful: $cmd $args"
+        // Poll the device to get updated state
+        def childDevice = getChildDevices().find { it.deviceNetworkId == "hubspace-${devId}" }
+        if (childDevice) {
+          runIn(2, "pollChild", [data: childDevice])
+        }
+      }
+    }
+  } catch (Exception e) {
+    log.error "Error sending command $cmd to device $devId: ${e.message}"
   }
 }
 
@@ -218,9 +184,17 @@ private getAccountId() {
 }
 
 private checkAndRenewToken() {
-  if (state.accessToken && state.tokenExpires && now() >= state.tokenExpires) {
-    oauthRenew()
+  if (!state.accessToken) {
+    log.warn "No access token available. Please configure the token in app settings."
+    return false
   }
+  
+  if (state.tokenExpires && now() >= state.tokenExpires) {
+    log.warn "Access token has expired. Please obtain a new token from HubSpace."
+    // Don't invalidate the token automatically - let user decide
+  }
+  
+  return true
 }
 
 void refreshIndexAndDiscover() {
@@ -277,67 +251,124 @@ void refreshIndexAndDiscover() {
 }
 
 private updateFromState(cd, Map deviceData) {
-  // Normalize into Hubitat attributes
-  def states = deviceData.states
+  // Handle both direct state values and states array format
+  def states = deviceData.states ?: deviceData
   if (!states) return
 
-  states.each { state ->
-    def functionClass = state.functionClass
-    def functionInstance = state.functionInstance
-    def value = state.value
-
-    switch (functionClass) {
-      case "power":
-        cd.sendEvent(name: "switch", value: value == "on" ? "on" : "off")
-        break
-      case "brightness":
-        cd.sendEvent(name: "level", value: (value as int))
-        break
-      case "color-temperature":
-        cd.sendEvent(name: "colorTemperature", value: (value as int))
-        break
-      case "fan-speed":
-        cd.sendEvent(name: "speed", value: (value as String))
-        break
-      case "lock":
-        cd.sendEvent(name: "lock", value: value == "locked" ? "locked" : "unlocked")
-        break
-      case "motion-detection":
-        cd.sendEvent(name: "motion", value: value == "motion-detected" ? "active" : "inactive")
-        break
-      case "humidity-threshold-met":
-        cd.sendEvent(name: "humidity", value: value == "above-threshold" ? "active" : "inactive")
-        break
-      case "auto-off-timer":
-        cd.sendEvent(name: "autoOffTimer", value: value as int)
-        break
-      case "motion-action":
-        cd.sendEvent(name: "motionAction", value: value as String)
-        break
-      case "sensitivity":
-        cd.sendEvent(name: "sensitivity", value: value as String)
-        break
-      case "temperature":
-        if (functionInstance == "current-temp") {
-          cd.sendEvent(name: "temperature", value: value as float)
-        } else if (functionInstance == "cooling-target") {
-          cd.sendEvent(name: "coolingSetpoint", value: value as float)
-        }
-        break
-      case "mode":
-        cd.sendEvent(name: "thermostatMode", value: value as String)
-        break
-      case "fan-speed": // for portable AC, this is a select
-        cd.sendEvent(name: "thermostatFanMode", value: value as String)
-        break
-      case "sleep": // for portable AC, this is a select
-        cd.sendEvent(name: "sleepMode", value: value as String)
-        break
-      // Add more cases for other device types and attributes as needed
-      default:
-        log.debug "Unhandled state: ${functionClass} - ${value}"
-        break
+  // If states is a list, process each state
+  if (states instanceof List) {
+    states.each { state ->
+      processStateValue(cd, state.functionClass, state.functionInstance, state.value)
+    }
+  } else {
+    // Handle direct state object format
+    states.each { key, value ->
+      processStateValue(cd, key, null, value)
     }
   }
+}
+
+private processStateValue(cd, String functionClass, String functionInstance, value) {
+  switch (functionClass) {
+    case "power":
+      cd.sendEvent(name: "switch", value: value == "on" ? "on" : "off")
+      break
+    case "brightness":
+      cd.sendEvent(name: "level", value: (value as int))
+      break
+    case "color-temperature":
+      cd.sendEvent(name: "colorTemperature", value: (value as int))
+      break
+    case "color-rgb":
+      if (value instanceof Map) {
+        def rgb = value
+        def hsv = rgbToHSV(rgb.r as int, rgb.g as int, rgb.b as int)
+        cd.sendEvent(name: "hue", value: hsv.h)
+        cd.sendEvent(name: "saturation", value: hsv.s)
+      }
+      break
+    case "fan-speed":
+      if (functionInstance == "ac-fan-speed") {
+        cd.sendEvent(name: "thermostatFanMode", value: value as String)
+      } else {
+        cd.sendEvent(name: "speed", value: (value as String))
+      }
+      break
+    case "lock":
+      cd.sendEvent(name: "lock", value: value == "locked" ? "locked" : "unlocked")
+      break
+    case "motion-detection":
+      cd.sendEvent(name: "motion", value: value == "motion-detected" ? "active" : "inactive")
+      break
+    case "humidity-threshold-met":
+      cd.sendEvent(name: "humidity", value: value == "above-threshold" ? "active" : "inactive")
+      break
+    case "auto-off-timer":
+      cd.sendEvent(name: "autoOffTimer", value: value as int)
+      break
+    case "motion-action":
+      cd.sendEvent(name: "motionAction", value: value as String)
+      break
+    case "sensitivity":
+      cd.sendEvent(name: "sensitivity", value: value as String)
+      break
+    case "temperature":
+      if (functionInstance == "current-temp") {
+        cd.sendEvent(name: "temperature", value: value as float)
+      } else if (functionInstance == "cooling-target") {
+        cd.sendEvent(name: "coolingSetpoint", value: value as float)
+      } else if (functionInstance == "heating-target") {
+        cd.sendEvent(name: "heatingSetpoint", value: value as float)
+      }
+      break
+    case "mode":
+      cd.sendEvent(name: "thermostatMode", value: value as String)
+      break
+    case "sleep":
+      cd.sendEvent(name: "sleepMode", value: value as String)
+      break
+    case "available":
+      cd.sendEvent(name: "presence", value: value ? "present" : "not present")
+      break
+    case "battery-level":
+      cd.sendEvent(name: "battery", value: value as int)
+      break
+    // Handle switches and power outlets
+    case "switch":
+      cd.sendEvent(name: "switch", value: value ? "on" : "off")
+      break
+    // Add more cases for other device types and attributes as needed
+    default:
+      log.debug "Unhandled state: ${functionClass}/${functionInstance} - ${value}"
+      break
+  }
+}
+
+// Helper function to convert RGB to HSV
+private Map rgbToHSV(int r, int g, int b) {
+  float rf = r / 255.0
+  float gf = g / 255.0
+  float bf = b / 255.0
+  
+  float max = Math.max(rf, Math.max(gf, bf))
+  float min = Math.min(rf, Math.min(gf, bf))
+  float delta = max - min
+  
+  float h = 0, s = 0, v = max
+  
+  if (delta != 0) {
+    s = delta / max
+    if (max == rf) {
+      h = ((gf - bf) / delta) % 6
+    } else if (max == gf) {
+      h = (bf - rf) / delta + 2
+    } else {
+      h = (rf - gf) / delta + 4
+    }
+    h *= 60
+    if (h < 0) h += 360
+  }
+  
+  return [h: Math.round(h * 100 / 360), s: Math.round(s * 100), v: Math.round(v * 100)]
 }
 
