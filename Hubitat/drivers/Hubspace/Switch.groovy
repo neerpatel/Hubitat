@@ -7,5 +7,5 @@ metadata {
 }
 def initialize() {}
 def refresh() { parent.pollChild(device) }
-def on()  { parent.sendHsCommand(device.deviceNetworkId - "hubspace-", "turn_on")  }
-def off() { parent.sendHsCommand(device.deviceNetworkId - "hubspace-", "turn_off") }
+def on()  { parent.sendHsCommand(device.deviceNetworkId - "hubspace-", "power", [value: "on"])  }
+def off() { parent.sendHsCommand(device.deviceNetworkId - "hubspace-", "power", [value: "off"]) }

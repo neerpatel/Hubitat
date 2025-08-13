@@ -57,20 +57,12 @@ def mainPage() {
 }
 
 
+
 // Handle app page buttons
 void appButtonHandler(String btn) {
   if (btn == "discoverNow") {
     log.debug "HubSpace Bridge: manual discovery requested"
     refreshIndexAndDiscover()
-    // Log discovery status if available
-    try {
-      httpGet([uri: "${bridgeUrl}/discovery/status", timeout: 10]) { resp ->
-        def d = resp?.data
-        log.debug "Discovery status: known=${d?.known_count}, current=${d?.current_count}, missing=${d?.missing_known}"
-      }
-    } catch (Throwable t) {
-      log.debug "Discovery status not available: ${t?.message}"
-    }
   }
 }
 
@@ -78,24 +70,81 @@ def installed() { initialize() }
 def updated()  { unschedule(); initialize() }
 
 def initialize() {
-  loginToBridge()
+  log.debug "Initializing HubspaceDeviceManager"
+  if (!state.accessToken) {
+    log.info "Access token not found. Please authorize Hubitat with your Hubspace account."
+    return
+  }
   discoverDevices()
   if (state.knownIds == null) state.knownIds = []
   schedule("*/${Math.max(15, pollSeconds)} * * * * ?", pollAll)
 }
 
-private loginToBridge() {
+def oauthInitUrl() {
+  log.debug "oauthInitUrl()"
+  state.redirectUri = "https://cloud.hubitat.com/oauth/st-callback"
+  def authUrl = "https://accounts.hubspaceconnect.com/auth/realms/thd/protocol/openid-connect/auth?" +
+                "response_type=code&" +
+                "client_id=hubspace_android&" +
+                "redirect_uri=${state.redirectUri}&" +
+                "scope=openid%20offline_access"
+  log.debug "Auth URL: ${authUrl}"
+  return authUrl
+}
+
+def oauthCallback(params) {
+  log.debug "oauthCallback(${params})"
+  def code = params.code
+  def accessTokenUrl = "https://accounts.hubspaceconnect.com/auth/realms/thd/protocol/openid-connect/token"
   def body = [
-    username: hsUser,
-    password: hsPass,
-    polling_interval: (pollSeconds ?: 30) as Integer
+    grant_type: "authorization_code",
+    client_id: "hubspace_android",
+    redirect_uri: state.redirectUri,
+    code: code
   ]
-  httpPostJson([
-    uri: "${bridgeUrl}/login",
-    body: body,
-    timeout: 10
-  ]) { resp ->
-    log.debug "Bridge login: ${resp.data}"
+
+  try {
+    httpPostJson(
+      uri: accessTokenUrl,
+      body: body,
+      timeout: 20
+    ) { resp ->
+      log.debug "OAuth Callback Response: ${resp.data}"
+      state.accessToken = resp.data.access_token
+      state.refreshToken = resp.data.refresh_token
+      state.tokenExpires = now() + (resp.data.expires_in * 1000)
+      log.info "Successfully obtained access token."
+      discoverDevices()
+    }
+  } catch (e) {
+    log.error "Error during OAuth callback: ${e.message}"
+  }
+}
+
+def oauthRenew() {
+  log.debug "oauthRenew()"
+  def refreshTokenUrl = "https://accounts.hubspaceconnect.com/auth/realms/thd/protocol/openid-connect/token"
+  def body = [
+    grant_type: "refresh_token",
+    client_id: "hubspace_android",
+    refresh_token: state.refreshToken
+  ]
+
+  try {
+    httpPostJson(
+      uri: refreshTokenUrl,
+      body: body,
+      timeout: 20
+    ) { resp ->
+      log.debug "OAuth Renew Response: ${resp.data}"
+      state.accessToken = resp.data.access_token
+      state.refreshToken = resp.data.refresh_token
+      state.tokenExpires = now() + (resp.data.expires_in * 1000)
+      log.info "Successfully renewed access token."
+    }
+  } catch (e) {
+    log.error "Error during OAuth renew: ${e.message}"
+    state.accessToken = null // Invalidate token to force re-auth
   }
 }
 
@@ -103,13 +152,16 @@ private discoverDevices() {
   refreshIndexAndDiscover()
 }
 
+
 def pollAll() {
+  checkAndRenewToken()
   getChildDevices()?.each { c -> pollChild(c) }
 }
 
 def pollChild(cd) {
   def devId = cd.deviceNetworkId - "hubspace-"
-  httpGet([uri: "${bridgeUrl}/state/${devId}", timeout: 10]) { resp ->
+  checkAndRenewToken()
+  httpGet([uri: "https://api2.afero.net/v1/accounts/${state.accountId}/metadevices/${devId}/state", headers: ["Authorization": "Bearer ${state.accessToken}"], timeout: 10]) { resp ->
     updateFromState(cd, resp.data)
   }
 }
@@ -129,6 +181,7 @@ String driverForType(String t) {
     case "light": return "HubSpace Light (LAN)"
     case "switch": return "HubSpace Switch (LAN)"
     case "fan": return "HubSpace Fan (LAN)"
+    case "exhaust-fan": return "HubSpace Exhaust Fan (LAN)"
     case "lock": return "HubSpace Lock (LAN)"
     case "thermostat": return "HubSpace Thermostat (LAN)"
     case "valve": return "HubSpace Valve (LAN)"
@@ -138,99 +191,153 @@ String driverForType(String t) {
 
 // Called by child driver commands
 def sendHsCommand(String devId, String cmd, Map args=[:]) {
-  httpPostJson([uri: "${bridgeUrl}/command/${devId}", body: [cmd: cmd, args: args], timeout: 10]) { resp ->
-    if(!resp.data?.ok) log.warn "Command failed: $cmd $args -> ${resp.data}"
+  checkAndRenewToken()
+  def payload = [
+    metadeviceId: devId,
+    values: [
+      [
+        functionClass: cmd,
+        functionInstance: args.instance ?: null,
+        value: args.value
+      ]
+    ]
+  ]
+  httpPutJson([uri: "https://api2.afero.net/v1/accounts/${state.accountId}/metadevices/${devId}/state", headers: ["Authorization": "Bearer ${state.accessToken}"], body: payload, timeout: 10]) { resp ->
+    if(resp.status != 200) log.warn "Command failed: $cmd $args -> ${resp.data}"
+  }
+}
+
+private getAccountId() {
+  if (!state.accountId) {
+    checkAndRenewToken()
+    httpGet([uri: "https://api2.afero.net/v1/users/me", headers: ["Authorization": "Bearer ${state.accessToken}"], timeout: 10]) { resp ->
+      state.accountId = resp.data.accountAccess[0].account.accountId
+      log.debug "Retrieved account ID: ${state.accountId}"
+    }
+  }
+}
+
+private checkAndRenewToken() {
+  if (state.accessToken && state.tokenExpires && now() >= state.tokenExpires) {
+    oauthRenew()
   }
 }
 
 void refreshIndexAndDiscover() {
+  getAccountId()
   // Ensure known set exists
   Set known = (state.knownIds ?: []) as Set
 
-  // First try the bridge's discover endpoint (returns only newly added devices)
-  Map discoverResp = null
+  // Get all devices from Hubspace API
+  List allDevices = []
   try {
-    httpPostJson([
-      uri: "${bridgeUrl}/discover",
-      body: [:],
-      timeout: 15
-    ]) { resp ->
-      discoverResp = resp?.data as Map
+    checkAndRenewToken()
+    httpGet([uri: "https://api2.afero.net/v1/accounts/${state.accountId}/metadevices", headers: ["Authorization": "Bearer ${state.accessToken}"], timeout: 15]) { resp ->
+      allDevices = resp?.data as List
     }
   } catch (Throwable t) {
-    log.warn "Discover endpoint failed (${t?.message}). Falling back to /devices diff."
-  }
-
-  if (discoverResp && discoverResp.new instanceof List) {
-    List newList = (discoverResp.new as List)
-    Integer addedCount = (discoverResp.added_count ?: newList.size()) as Integer
-    Integer allCount = (discoverResp.all_count ?: -1) as Integer
-    log.debug "Bridge discover: added=${addedCount}, total=${allCount}"
-
-    // Create newly discovered devices
-    newList.each { Map d ->
-      String id   = (d.id ?: d.deviceId ?: d.uuid)?.toString()
-      String name = (d.name ?: d.label ?: "HubSpace ${id}")?.toString()
-      String type = (d.type ?: d.category ?: "device")?.toString().toLowerCase()
-      if (!id) return
-      if (!known.contains(id)) {
-        String dni = "hubspace-${id}"
-        String driver = driverForType(type)
-        def child = getChildDevice(dni) ?: addChildDevice(
-          "neerpatel/hubspace",
-          driver,
-          dni,
-          [label: name, isComponent: false]
-        )
-        child?.updateDataValue("hsType", type as String)
-        known << id
-        log.debug "Discovered (bridge/new): ${name} (${type}) id=${id}"
-      }
-    }
-
-    // Update local cache
-    state.knownIds = known as List
+    log.warn "Failed to retrieve devices from Hubspace API: ${t?.message}"
     return
   }
 
-  // Fallback: full /devices index + diff
-  Map<String, Map> index = [:]
-  httpGet([uri: "${bridgeUrl}/devices", timeout: 15]) { resp ->
-    (resp.data ?: []).each { d ->
-      String id   = (d.id ?: d.deviceId ?: d.uuid)?.toString()
-      String name = (d.name ?: d.label ?: "HubSpace ${id}")?.toString()
-      String type = (d.type ?: d.category ?: "device")?.toString().toLowerCase()
-      if (!id) return
-      index[id] = [id:id, name:name, type:type]
-    }
-  }
+  // Process discovered devices
+  allDevices.each { Map d ->
+    String id   = (d.id)?.toString()
+    String name = (d.friendly_name ?: d.default_name ?: "HubSpace ${id}")?.toString()
+    String type = (d.device_class)?.toString().toLowerCase()
+    if (!id) return
 
-  // Create any new children
-  index.each { String id, Map meta ->
     if (!known.contains(id)) {
       String dni = "hubspace-${id}"
-      String driver = driverForType(meta.type)
+      String driver = driverForType(type)
       def child = getChildDevice(dni) ?: addChildDevice(
         "neerpatel/hubspace",
         driver,
         dni,
-        [label: meta.name, isComponent: false]
+        [label: name, isComponent: false]
       )
-      child?.updateDataValue("hsType", meta.type as String)
+      child?.updateDataValue("hsType", type as String)
       known << id
-      log.debug "Discovered (fallback): ${meta.name} (${meta.type}) id=${id}"
+      log.debug "Discovered: ${name} (${type}) id=${id}"
     }
   }
 
-  // Optionally: update labels/types for existing devices
-  getChildDevices()?.each { cd ->
+  // Remove devices that are no longer in Hubspace
+  def currentChildDevices = getChildDevices()
+  currentChildDevices.each { cd ->
     String id = cd.deviceNetworkId - "hubspace-"
-    Map meta = index[id]
-    if (meta) {
-      if (cd.label != meta.name) cd.setLabel(meta.name)
-      cd.updateDataValue("hsType", meta.type as String)
+    if (!allDevices.find { it.id == id }) {
+      log.debug "Removing device no longer in Hubspace: ${cd.displayName} (${id})"
+      deleteChildDevice(cd.deviceNetworkId)
+      known.remove(id)
     }
   }
 
   state.knownIds = known as List
 }
+
+private updateFromState(cd, Map deviceData) {
+  // Normalize into Hubitat attributes
+  def states = deviceData.states
+  if (!states) return
+
+  states.each { state ->
+    def functionClass = state.functionClass
+    def functionInstance = state.functionInstance
+    def value = state.value
+
+    switch (functionClass) {
+      case "power":
+        cd.sendEvent(name: "switch", value: value == "on" ? "on" : "off")
+        break
+      case "brightness":
+        cd.sendEvent(name: "level", value: (value as int))
+        break
+      case "color-temperature":
+        cd.sendEvent(name: "colorTemperature", value: (value as int))
+        break
+      case "fan-speed":
+        cd.sendEvent(name: "speed", value: (value as String))
+        break
+      case "lock":
+        cd.sendEvent(name: "lock", value: value == "locked" ? "locked" : "unlocked")
+        break
+      case "motion-detection":
+        cd.sendEvent(name: "motion", value: value == "motion-detected" ? "active" : "inactive")
+        break
+      case "humidity-threshold-met":
+        cd.sendEvent(name: "humidity", value: value == "above-threshold" ? "active" : "inactive")
+        break
+      case "auto-off-timer":
+        cd.sendEvent(name: "autoOffTimer", value: value as int)
+        break
+      case "motion-action":
+        cd.sendEvent(name: "motionAction", value: value as String)
+        break
+      case "sensitivity":
+        cd.sendEvent(name: "sensitivity", value: value as String)
+        break
+      case "temperature":
+        if (functionInstance == "current-temp") {
+          cd.sendEvent(name: "temperature", value: value as float)
+        } else if (functionInstance == "cooling-target") {
+          cd.sendEvent(name: "coolingSetpoint", value: value as float)
+        }
+        break
+      case "mode":
+        cd.sendEvent(name: "thermostatMode", value: value as String)
+        break
+      case "fan-speed": // for portable AC, this is a select
+        cd.sendEvent(name: "thermostatFanMode", value: value as String)
+        break
+      case "sleep": // for portable AC, this is a select
+        cd.sendEvent(name: "sleepMode", value: value as String)
+        break
+      // Add more cases for other device types and attributes as needed
+      default:
+        log.debug "Unhandled state: ${functionClass} - ${value}"
+        break
+    }
+  }
+}
+
