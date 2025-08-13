@@ -184,17 +184,9 @@ private getAccountId() {
 }
 
 private checkAndRenewToken() {
-  if (!state.accessToken) {
-    log.warn "No access token available. Please configure the token in app settings."
-    return false
+  if (state.accessToken && state.tokenExpires && now() >= state.tokenExpires) {
+    oauthRenew()
   }
-  
-  if (state.tokenExpires && now() >= state.tokenExpires) {
-    log.warn "Access token has expired. Please obtain a new token from HubSpace."
-    // Don't invalidate the token automatically - let user decide
-  }
-  
-  return true
 }
 
 void refreshIndexAndDiscover() {
