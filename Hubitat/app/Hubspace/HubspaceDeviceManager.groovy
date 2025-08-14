@@ -121,21 +121,32 @@ private performWebAppLogin() {
       uri: authUrl,
       query: codeParams,
       followRedirects: false,
-      textParser: false,
+      textParser: true,
+      contentType: "text/html",
       timeout: 20
     ]) { resp ->
       if (resp.status != 200) {
         throw new Exception("Failed to get auth page: ${resp.status}")
       }
+      def html = resp.data.text
+ 
+        // Try to find the login form action URL
+      def formAction = extractFromHtml(html, '<form[^>]*id=["\']kc-form-login["\'][^>]*action=["\']([^"\']*)["\']') ?:
+                      extractFromHtml(html, '<form[^>]*action=["\']([^"\']*)["\'][^>]*id=["\']kc-form-login["\']') ?:
+                      extractFromHtml(html, 'action=["\']([^"\']*login-actions/authenticate[^"\']*)["\']')
       
-      // Parse the HTML to extract hidden form fields
-      def html = resp.data.toString()
-      log.debug "resp properties: ${resp?.properties?.keySet()}" // headers, class, entity, status, contentType, locale, allHeaders, params, data, context, success, statusLine, protocolVersion
-      log.debug "Received auth page HTML: ${resp.contentType}"
-      log.debug "Received auth page HTML: ${html}"
-      def sessionCode = extractFromHtml(html, 'name="session_code" value="([^"]*)"')
-      def execution = extractFromHtml(html, 'name="execution" value="([^"]*)"')
-      def tabId = extractFromHtml(html, 'name="tab_id" value="([^"]*)"')
+      
+      log.debug "Found form action: ${formAction}"  // formAction = 'https://accounts.hubspaceconnect.com/auth/realms/thd/login-actions/authenticate?session_code=ECB6CA8K8lpjo2bwKlGzSiR5FnBAKfg5LYRCaYWMGWo&execution=fc7165a5-4574-41ca-83e4-0b3c1a80e583&client_id=hubspace_android&tab_id=w6-UlDdV1eI'
+
+      // Extract session_code, execution, tab_id from formAction URL if present
+      def sessionCode = formAction =~ /session_code=([^&]*)/ ? (formAction =~ /session_code=([^&]*)/)[0][1] : null
+      def execution = formAction =~ /execution=([^&]*)/ ? (formAction =~ /execution=([^&]*)/)[0][1] : null
+      def tabId = formAction =~ /tab_id=([^&]*)/ ? (formAction =~ /tab_id=([^&]*)/)[0][1] : null
+
+      // Fallback to extracting from HTML if not found in formAction
+      if (!sessionCode) sessionCode = extractFromHtml(html, 'name="session_code" value="([^"]*)"')
+      if (!execution) execution = extractFromHtml(html, 'name="execution" value="([^"]*)"')
+      if (!tabId) tabId = extractFromHtml(html, 'name="tab_id" value="([^"]*)"')
       log.debug "Extracted auth page parameters: sessionCode=${sessionCode}, execution=${execution}, tabId=${tabId}"
       if (!sessionCode || !execution || !tabId) {
         throw new Exception("Failed to extract session parameters from auth page")
@@ -184,13 +195,17 @@ private generateChallengeData() {
 
 private submitLoginCredentials(String sessionCode, String execution, String tabId, Map challenge) {
   def loginUrl = generateAuthUrl("/login-actions/authenticate")
+  def loginParams = [
+
+    "session_code": sessionCode,
+    "execution": execution,
+    "client_id": "hubspace_android",
+    "tab_id": tabId
+  ]
   def loginData = [
     "username": settings.username,
     "password": settings.password,
-    "credentialId": "",
-    "session_code": sessionCode,
-    "execution": execution,
-    "tab_id": tabId
+    "credentialId": ""
   ]
   
   def headers = [
@@ -199,13 +214,19 @@ private submitLoginCredentials(String sessionCode, String execution, String tabI
   ]
   
   log.debug "Submitting login credentials to: ${loginUrl}"
-  
+  log.debug "Login parameters: ${loginParams}"
+  log.debug "Login data: ${loginData}"
+
   httpPost([
     uri: loginUrl,
+    query: loginParams,
+    followRedirects: false,
     body: loginData,
     headers: headers,
+    textParser: true,
     timeout: 20
   ]) { resp ->
+    log.debug "Login response: ${resp.status} ${resp.data}"
     if (resp.status == 302 || resp.status == 200) {
       // Check for redirect with authorization code
       def location = resp.headers["Location"]?.value
@@ -242,7 +263,7 @@ private exchangeCodeForToken(String code, Map challenge) {
   ]
   
   log.debug "Exchanging code for token at: ${tokenUrl}"
-  
+
   httpPost([
     uri: tokenUrl,
     body: tokenData,
