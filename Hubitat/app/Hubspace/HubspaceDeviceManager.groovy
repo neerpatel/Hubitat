@@ -371,11 +371,12 @@ def pollChild(cd) {
   try {
     def url = generateApiUrl("/v1/accounts/${state.accountId}/metadevices/${devId}/state")
     httpGet([
-      uri: url, 
+      uri: url,
       headers: [
         "Authorization": "Bearer ${state.accessToken}",
-        "Host": "api2.afero.net"
-      ], 
+        // Use data host for metadevice state paths to match HubSpace client behavior
+        "Host": "semantics2.afero.net"
+      ],
       timeout: 10
     ]) { resp ->
       updateFromState(cd, resp.data)
@@ -422,13 +423,14 @@ def sendHsCommand(String devId, String cmd, Map args=[:]) {
   try {
     def url = generateApiUrl("/v1/accounts/${state.accountId}/metadevices/${devId}/state")
     httpPutJson([
-      uri: url, 
+      uri: url,
       headers: [
         "Authorization": "Bearer ${state.accessToken}",
-        "Host": "api2.afero.net",
+        // Use data host for metadevice state updates to match HubSpace client behavior
+        "Host": "semantics2.afero.net",
         "Content-Type": "application/json; charset=utf-8"
-      ], 
-      body: payload, 
+      ],
+      body: payload,
       timeout: 10
     ]) { resp ->
       if(resp.status != 200) {
@@ -514,11 +516,12 @@ void refreshIndexAndDiscover() {
     
     def url = generateApiUrl("/v1/accounts/${state.accountId}/metadevices")
     httpGet([
-      uri: url, 
+      uri: url,
       headers: [
         "Authorization": "Bearer ${state.accessToken}",
-        "Host": "api2.afero.net"
-      ], 
+        // Use data host for metadevice list to match HubSpace client behavior
+        "Host": "semantics2.afero.net"
+      ],
       params: ["expansions": "state"],
       timeout: 15
     ]) { resp ->
@@ -686,4 +689,3 @@ private Map rgbToHSV(int r, int g, int b) {
   
   return [h: Math.round(h * 100 / 360), s: Math.round(s * 100), v: Math.round(v * 100)]
 }
-
