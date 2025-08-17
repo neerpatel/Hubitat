@@ -1,6 +1,0 @@
-pytest
-pytest-mock
-pytest-asyncio
-responses
-pre-commit
-pytest-homeassistant-custom-component
