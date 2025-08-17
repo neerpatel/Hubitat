@@ -18,6 +18,9 @@ A minimal Node.js service that performs HubSpace (Afero) authentication and prox
   - Body: `{ values: [{ functionClass, functionInstance?, value }] }`
   - Response: `{ ok: true }` on success
 
+- GET `/health`
+  - Response: `{ status: 'ok', uptime, sessions, version }`
+
 ## Install and Run
 
 - `cd bridge-node`
@@ -37,3 +40,14 @@ A minimal Node.js service that performs HubSpace (Afero) authentication and prox
 - The bridge automatically refreshes access tokens using the refresh token when expired.
 - The bridge uses the correct host routing: `api2.afero.net` for core and `semantics2.afero.net` for metadevice data.
 
+## Test Automation
+
+- Direct cloud login/device listing (no bridge):
+  - `chmod +x scripts/test_hubspace_auth.sh`
+  - `HUBSPACE_USERNAME="you@example.com" HUBSPACE_PASSWORD="pass" ./scripts/test_hubspace_auth.sh`
+
+- Bridge end‑to‑end:
+  - `chmod +x scripts/test_bridge.sh`
+  - `HUBSPACE_USERNAME="you@example.com" HUBSPACE_PASSWORD="pass" ./scripts/test_bridge.sh`
+  - Optional write test (toggle first light/switch):
+    - `TEST_COMMANDS=onoff HUBSPACE_USERNAME=... HUBSPACE_PASSWORD=... ./scripts/test_bridge.sh`

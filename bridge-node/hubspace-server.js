@@ -15,7 +15,22 @@ const API_HOST = 'api2.afero.net'
 const DATA_HOST = 'semantics2.afero.net'
 
 const app = express()
+// Accept both JSON and URL-encoded bodies for compatibility with various clients
 app.use(express.json())
+app.use(express.urlencoded({ extended: true }))
+
+// Basic request logging (method, path, query)
+app.use((req, _res, next) => {
+  try {
+    const safeBody = req.body && typeof req.body === 'object'
+      ? Object.keys(req.body).reduce((acc, k) => { acc[k] = (k.toLowerCase().includes('password') ? '***' : req.body[k]); return acc }, {})
+      : undefined
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.path} q=${JSON.stringify(req.query)} b=${safeBody ? JSON.stringify(safeBody) : ''}`)
+  } catch (_) {
+    // ignore logging errors
+  }
+  next()
+})
 
 // In-memory session store: sessionId -> { refresh_token, access_token, expiration, accountId }
 const sessions = new Map()
@@ -173,11 +188,14 @@ app.post('/login', async (req, res) => {
   const { username, password } = req.body || {}
   if (!username || !password) return res.status(400).json({ error: 'username and password required' })
   try {
+    console.log(`[auth] Starting login for ${username}`)
     const tok = await performLogin(username, password)
     const sessionId = uuidv4()
     sessions.set(sessionId, tok)
+    console.log(`[auth] Login success for ${username}, session=${sessionId}`)
     res.json({ sessionId, accountId: tok.accountId })
   } catch (e) {
+    console.error('[auth] Login failed', e)
     res.status(500).json({ error: e.message })
   }
 })
@@ -254,7 +272,20 @@ app.post('/command/:id', async (req, res) => {
   }
 })
 
+// GET /health
+app.get('/health', (req, res) => {
+  try {
+    res.json({
+      status: 'ok',
+      uptime: process.uptime(),
+      sessions: sessions.size,
+      version: '0.1.0',
+    })
+  } catch (e) {
+    res.status(500).json({ status: 'error', error: e.message })
+  }
+})
+
 app.listen(PORT, () => {
   console.log(`HubSpace bridge listening on :${PORT}`)
 })
-
