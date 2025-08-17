@@ -117,6 +117,7 @@ private performWebAppLogin() {
     
     log.debug "Getting auth page: ${authUrl} with params: ${codeParams}"
     
+    def cookieHeader = null
     httpGet([
       uri: authUrl,
       query: codeParams,
@@ -129,6 +130,27 @@ private performWebAppLogin() {
         throw new Exception("Failed to get auth page: ${resp.status}")
       }
       def html = resp.data.text
+
+      // Capture cookies from the auth page to include in subsequent POST
+      try {
+        def cookies = []
+        resp.headers?.each { k, v ->
+          if (k?.toString()?.equalsIgnoreCase('Set-Cookie')) {
+            // Only send cookie name=value
+            def nv = v?.value?.toString()?.tokenize(';')?.getAt(0)
+            if (nv) cookies << nv
+          }
+        }
+        if (cookies) {
+          cookieHeader = cookies.unique().join('; ')
+          state._authCookies = cookieHeader
+          log.debug "Captured ${cookies.size()} cookies from auth page"
+        } else {
+          state._authCookies = null
+        }
+      } catch (ignored) {
+        // Ignore cookie parse errors; continue without cookies
+      }
  
         // Try to find the login form action URL
       def formAction = extractFromHtml(html, '<form[^>]*id=["\']kc-form-login["\'][^>]*action=["\']([^"\']*)["\']') ?:
@@ -210,8 +232,14 @@ private submitLoginCredentials(String sessionCode, String execution, String tabI
   
   def headers = [
     "Content-Type": "application/x-www-form-urlencoded",
-    "User-Agent": "Dart/2.15 (dart:io)"
+    "User-Agent": "Dart/3.1 (dart:io)",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
   ]
+  // Include cookies from the auth GET if present
+  if (state._authCookies) {
+    headers["Cookie"] = state._authCookies
+    headers["Referer"] = generateAuthUrl("/protocol/openid-connect/auth")
+  }
   
   log.debug "Submitting login credentials to: ${loginUrl}"
   log.debug "Login parameters: ${loginParams}"
@@ -260,7 +288,9 @@ private exchangeCodeForToken(String code, Map challenge) {
   
   def headers = [
     "Content-Type": "application/x-www-form-urlencoded",
-    "User-Agent": "Dart/2.15 (dart:io)"
+    "User-Agent": "Dart/3.1 (dart:io)",
+    "Accept": "application/json",
+    "Host": "accounts.hubspaceconnect.com"
   ]
   
   log.debug "Exchanging code for token at: ${tokenUrl}"
@@ -304,7 +334,9 @@ private refreshAccessToken() {
   
   def headers = [
     "Content-Type": "application/x-www-form-urlencoded",
-    "User-Agent": "Dart/2.15 (dart:io)"
+    "User-Agent": "Dart/3.1 (dart:io)",
+    "Accept": "application/json",
+    "Host": "accounts.hubspaceconnect.com"
   ]
   
   log.debug "Refreshing access token"
