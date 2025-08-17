@@ -444,30 +444,26 @@ private connectToNodeBridge() {
   }
   
   try {
-    def loginData = [
-      username: settings.username,
-      password: settings.password
-    ]
-    
-    log.debug "Connecting to Node.js bridge at: ${settings.nodeBridgeUrl}"
-    
+    def loginData = [username: settings.username, password: settings.password]
+    log.info "[NodeBridge] POST /login ${settings.nodeBridgeUrl}"
     httpPost([
       uri: "${settings.nodeBridgeUrl}/login",
       headers: ["Content-Type": "application/json"],
-      body: loginData,
+      contentType: 'application/json',
+      body: groovy.json.JsonOutput.toJson(loginData),
       timeout: 15
     ]) { resp ->
       if (resp.status == 200) {
         def responseData = resp.data
         state.nodeSessionId = responseData.sessionId
         state.nodeBridgeAccountId = responseData.accountId
-        log.info "Successfully connected to Node.js bridge. Session ID: ${state.nodeSessionId}"
+        log.info "[NodeBridge] Connected. session=${state.nodeSessionId} accountId=${state.nodeBridgeAccountId}"
       } else {
-        throw new Exception("Bridge login failed with status: ${resp.status}")
+        throw new Exception("[NodeBridge] Login failed with status: ${resp.status}")
       }
     }
   } catch (Exception e) {
-    log.error "Failed to connect to Node.js bridge: ${e.message}"
+    log.error "[NodeBridge] Failed to connect: ${e.message}"
     state.nodeSessionId = null
   }
 }
@@ -517,15 +513,17 @@ def pollChild(cd) {
   def devId = cd.deviceNetworkId - "hubspace-"
   if (settings.useNodeBridge) {
     try {
+      log.debug "[NodeBridge] GET /state/${devId}"
       httpGet([
         uri: "${settings.nodeBridgeUrl}/state/${devId}",
         params: [session: state.nodeSessionId],
         timeout: 10
       ]) { resp ->
+        log.debug "[NodeBridge] state status=${resp.status}"
         updateFromState(cd, resp.data)
       }
     } catch (Exception e) {
-      log.warn "Node bridge error polling device ${cd.displayName}: ${e.message}"
+      log.warn "[NodeBridge] Error polling ${cd.displayName}: ${e.message}"
     }
     return
   }
@@ -572,17 +570,19 @@ def sendHsCommand(String devId, String cmd, Map args=[:]) {
   if (settings.useNodeBridge) {
     def values = [[functionClass: cmd, functionInstance: args.instance ?: null, value: args.value]]
     try {
+      log.info "[NodeBridge] POST /command/${devId} cmd=${cmd} args=${args}"
       httpPost([
         uri: "${settings.nodeBridgeUrl}/command/${devId}",
         params: [session: state.nodeSessionId],
         headers: ["Content-Type": "application/json; charset=utf-8"],
-        body: [values: values],
+        contentType: 'application/json',
+        body: groovy.json.JsonOutput.toJson([values: values]),
         timeout: 10
       ]) { resp ->
         if (resp.status != 200) {
-          log.warn "Node bridge command failed: $cmd $args -> ${resp.data}"
+          log.warn "[NodeBridge] Command failed: $cmd $args -> status=${resp.status}"
         } else {
-          log.debug "Node bridge command successful: $cmd $args"
+          log.debug "[NodeBridge] Command successful: $cmd $args"
           def childDevice = getChildDevices().find { it.deviceNetworkId == "hubspace-${devId}" }
           if (childDevice) {
             runIn(2, "pollChild", [data: childDevice])
@@ -590,7 +590,7 @@ def sendHsCommand(String devId, String cmd, Map args=[:]) {
         }
       }
     } catch (Exception e) {
-      log.error "Node bridge error sending command $cmd to device $devId: ${e.message}"
+      log.error "[NodeBridge] Error sending command $cmd to device $devId: ${e.message}"
     }
     return
   }
@@ -699,11 +699,15 @@ void refreshIndexAndDiscover() {
   List allDevices = []
   try {
     if (settings.useNodeBridge) {
+      log.info "[NodeBridge] GET /devices"
       httpGet([
         uri: "${settings.nodeBridgeUrl}/devices",
         params: [session: state.nodeSessionId],
         timeout: 15
-      ]) { resp -> allDevices = resp?.data as List }
+      ]) { resp ->
+        log.debug "[NodeBridge] devices status=${resp.status} count=${resp?.data?.size()}"
+        allDevices = resp?.data as List
+      }
     } else {
       if (!checkAndRenewToken()) return
       def url = generateApiUrl("/v1/accounts/${state.accountId}/metadevices")

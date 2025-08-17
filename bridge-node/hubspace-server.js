@@ -1,8 +1,9 @@
 import express from 'express'
 import fetch from 'node-fetch'
-import cheerio from 'cheerio'
+import { load as loadHtml } from 'cheerio'
 import qs from 'qs'
 import { v4 as uuidv4 } from 'uuid'
+import { randomBytes, createHash } from 'node:crypto'
 
 // Config
 const PORT = process.env.PORT || 3000
@@ -35,8 +36,8 @@ app.use((req, _res, next) => {
 // In-memory session store: sessionId -> { refresh_token, access_token, expiration, accountId }
 const sessions = new Map()
 
-function base64UrlEncode(buffer) {
-  return Buffer.from(buffer)
+function base64UrlEncode(buf) {
+  return Buffer.from(buf)
     .toString('base64')
     .replace(/=/g, '')
     .replace(/\+/g, '-')
@@ -44,8 +45,8 @@ function base64UrlEncode(buffer) {
 }
 
 function genPkce() {
-  const verifier = base64UrlEncode(require('crypto').randomBytes(40)).replace(/[^a-zA-Z0-9_-]/g, '')
-  const challenge = base64UrlEncode(require('crypto').createHash('sha256').update(verifier).digest())
+  const verifier = base64UrlEncode(randomBytes(40)).replace(/[^a-zA-Z0-9_-]/g, '')
+  const challenge = base64UrlEncode(createHash('sha256').update(verifier).digest())
   return { verifier, challenge }
 }
 
@@ -95,7 +96,7 @@ async function performLogin(username, password) {
   })
   const cookies = parseSetCookie(getResp)
   const html = await getResp.text()
-  const $ = cheerio.load(html)
+  const $ = loadHtml(html)
   const form = $('form#kc-form-login')
   if (!form || form.length === 0) throw new Error('Login form not found')
   let action = form.attr('action') || ''
@@ -212,6 +213,7 @@ app.get('/devices', async (req, res) => {
       headers: { Authorization: `Bearer ${sess.access_token}`, Host: DATA_HOST },
     })
     const data = await resp.json()
+    console.log(`[devices] account=${sess.accountId} status=${resp.status} count=${Array.isArray(data) ? data.length : 'n/a'}`)
     const minimal = (Array.isArray(data) ? data : []).map((d) => ({
       id: d.id || d.deviceId || d.metadeviceId || d.device_id,
       typeId: d.typeId || d.type,
@@ -221,6 +223,7 @@ app.get('/devices', async (req, res) => {
     }))
     res.json(minimal)
   } catch (e) {
+    console.error('[devices] error', e)
     res.status(500).json({ error: e.message })
   }
 })
@@ -237,9 +240,11 @@ app.get('/state/:id', async (req, res) => {
     const resp = await http('GET', url, {
       headers: { Authorization: `Bearer ${sess.access_token}`, Host: DATA_HOST },
     })
+    console.log(`[state] device=${deviceId} status=${resp.status}`)
     const json = await resp.json()
     res.json(json)
   } catch (e) {
+    console.error('[state] error', e)
     res.status(500).json({ error: e.message })
   }
 })
@@ -264,10 +269,12 @@ app.post('/command/:id', async (req, res) => {
       },
       body: JSON.stringify(payload),
     })
+    console.log(`[command] device=${deviceId} status=${resp.status} body=${JSON.stringify(values)}`)
     const text = await resp.text()
     if (!resp.ok) return res.status(resp.status).json({ error: text })
     res.json({ ok: true })
   } catch (e) {
+    console.error('[command] error', e)
     res.status(500).json({ error: e.message })
   }
 })
