@@ -1,0 +1,3 @@
+[submodule "tmp/aioafero"]
+	path = tmp/aioafero
+	url = https://github.com/Expl0dingBanana/aioafero
