@@ -124,6 +124,10 @@ private performWebAppLogin() {
       followRedirects: false,
       textParser: true,
       contentType: "text/html",
+      headers: [
+        "User-Agent": "Dart/3.1 (dart:io)",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+      ],
       timeout: 20
     ]) { resp ->
       if (resp.status != 200) {
@@ -157,8 +161,12 @@ private performWebAppLogin() {
                       extractFromHtml(html, '<form[^>]*action=["\']([^"\']*)["\'][^>]*id=["\']kc-form-login["\']') ?:
                       extractFromHtml(html, 'action=["\']([^"\']*login-actions/authenticate[^"\']*)["\']')
       
+      // Decode HTML entities (matching shell script behavior)
+      if (formAction) {
+        formAction = formAction.replace('&amp;', '&')
+      }
       
-      log.debug "Found form action: ${formAction}"  // formAction = 'https://accounts.hubspaceconnect.com/auth/realms/thd/login-actions/authenticate?session_code=ECB6CA8K8lpjo2bwKlGzSiR5FnBAKfg5LYRCaYWMGWo&execution=fc7165a5-4574-41ca-83e4-0b3c1a80e583&client_id=hubspace_android&tab_id=w6-UlDdV1eI'
+      log.debug "Found form action: ${formAction}"
 
       // Extract session_code, execution, tab_id from formAction URL if present
       def sessionCode = formAction =~ /session_code=([^&]*)/ ? (formAction =~ /session_code=([^&]*)/)[0][1] : null
@@ -176,8 +184,8 @@ private performWebAppLogin() {
       
       //log.debug "Extracted session parameters: sessionCode=${sessionCode}, execution=${execution}, tabId=${tabId}"
       
-      // Step 2: Submit login credentials
-      submitLoginCredentials(sessionCode, execution, tabId, challenge)
+      // Step 2: Submit login credentials using the extracted form action URL
+      submitLoginCredentials(formAction, challenge)
     }
   } catch (Exception e) {
     log.error "Authentication failed: ${e.message}"
@@ -188,14 +196,16 @@ private performWebAppLogin() {
 private generateChallengeData() {
   log.debug "Generating PKCE challenge data"
   
-  // Generate code verifier - 40 random bytes, base64url encoded
+  // Generate code verifier - 40 random bytes, base64url encoded (matching shell script)
   def random = new Random()
   def bytes = new byte[40]
   random.nextBytes(bytes)
   
+  // Base64 encode, then convert to base64url format and remove any non-alphanumeric chars
   def codeVerifier = bytes.encodeBase64().toString()
     .replace('+', '-')
     .replace('/', '_')
+    .replace('=', '')
     .replaceAll('[^a-zA-Z0-9\\-_]', '')
   
   // Generate code challenge - SHA256 hash of verifier, base64url encoded
@@ -215,15 +225,11 @@ private generateChallengeData() {
   ]
 }
 
-private submitLoginCredentials(String sessionCode, String execution, String tabId, Map challenge) {
-  def loginUrl = generateAuthUrl("/login-actions/authenticate")
-  def loginParams = [
-
-    "session_code": sessionCode,
-    "execution": execution,
-    "client_id": "hubspace_android",
-    "tab_id": tabId
-  ]
+private submitLoginCredentials(String loginUrl, Map challenge) {
+  // Use the form action URL directly (as extracted from the auth page)
+  log.debug "Using form action URL: ${loginUrl}"
+  
+  // Body data only contains credentials (matching shell script format)
   def loginData = [
     "username": settings.username,
     "password": settings.password,
@@ -238,17 +244,16 @@ private submitLoginCredentials(String sessionCode, String execution, String tabI
   // Include cookies from the auth GET if present
   if (state._authCookies) {
     headers["Cookie"] = state._authCookies
+    // Optional Referer for stricter IdP enforcement
     headers["Referer"] = generateAuthUrl("/protocol/openid-connect/auth")
   }
   
   log.debug "Submitting login credentials to: ${loginUrl}"
-  log.debug "Login parameters: ${loginParams}"
   // Do NOT log raw credentials
   log.debug "Login data: [username:${settings.username}, password:***, credentialId:<hidden>]"
 
   httpPost([
     uri: loginUrl,
-    query: loginParams,
     followRedirects: false,
     body: loginData,
     headers: headers,
@@ -571,10 +576,20 @@ void refreshIndexAndDiscover() {
 
   // Process discovered devices
   allDevices.each { Map d ->
-    String id   = (d.id)?.toString()
-    String name = (d.friendly_name ?: d.default_name ?: "HubSpace ${id}")?.toString()
-    String type = (d.device_class)?.toString().toLowerCase()
-    if (!id) return
+    // Shape can vary by endpoint/expansion.
+    String typeId = (d.typeId ?: d.type)?.toString()
+    if (typeId && typeId != 'metadevice.device') {
+      // Skip rooms, groups, home containers, etc.
+      return
+    }
+    String id = (d.id ?: d.deviceId ?: d.metadeviceId ?: d.device_id)?.toString()
+    String type = (
+      d.device_class ?: d?.description?.device?.deviceClass ?: d?.description?.deviceClass
+    )?.toString()?.toLowerCase()
+    String name = (
+      d.friendlyName ?: d.friendly_name ?: d?.description?.device?.friendlyName ?: d.default_name ?: (id ? "HubSpace ${id}" : null)
+    )?.toString()
+    if (!id || !type) return
 
     if (!known.contains(id)) {
       String dni = "hubspace-${id}"
