@@ -156,6 +156,17 @@ DEVICES=$(curl -sS -X GET "https://$API_HOST/v1/accounts/$ACCOUNT_ID/metadevices
 COUNT=$(echo "$DEVICES" | jq 'length' 2>/dev/null || echo "n/a")
 echo "Devices returned: $COUNT"
 
+echo "[5b/6] Devices list (id | class | name)"
+echo "$DEVICES" | jq -r '
+  .[]
+  | {
+      id: (.deviceId // .id // .metadeviceId // .device_id),
+      class: (.description.device.deviceClass // .device_class // .typeId // .description.deviceClass // .type),
+      name: (.description.device.friendlyName // .friendlyName // .friendly_name // .name)
+    }
+  | select(.id != null)
+  | "\(.id) | \(.class) | \(.name)"'
+
 echo "[6/6] Example: show first device keys and id/class"
 echo "$DEVICES" | jq '.[0] | {keys: (keys)}' 2>/dev/null || true
 echo "$DEVICES" | jq '.[0] | {
