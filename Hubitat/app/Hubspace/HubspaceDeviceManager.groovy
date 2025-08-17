@@ -41,6 +41,21 @@ def mainPage() {
         input name: "disconnectNow", type: "button", title: "Disconnect from HubSpace"
       }
     }
+    section("Bridge Configuration") {
+      paragraph "Optional: Use external Node.js bridge server for improved reliability and performance."
+      input "useNodeBridge", "bool", title: "Use Node.js Bridge Server", defaultValue: false, required: false
+      input "nodeBridgeUrl", "text", title: "Bridge Server URL", description: "e.g., http://192.168.1.100:3000", required: false
+      if (settings.useNodeBridge && settings.nodeBridgeUrl) {
+        if (state.nodeSessionId) {
+          paragraph "✅ Connected to bridge server"
+          input name: "testBridge", type: "button", title: "Test Bridge Connection"
+          input name: "disconnectBridge", type: "button", title: "Disconnect Bridge"
+        } else {
+          paragraph "⚠️ Bridge server configured but not connected"
+          input name: "connectBridge", type: "button", title: "Connect to Bridge"
+        }
+      }
+    }
     section("Polling") {
       input "pollSeconds", "number", title: "Poll interval (sec)", defaultValue: 30, required: true
     }
@@ -81,6 +96,16 @@ void appButtonHandler(String btn) {
     } else {
       log.warn "No refresh token available. Please re-authenticate."
     }
+  } else if (btn == "connectBridge") {
+    log.debug "HubSpace Bridge: bridge connection requested"
+    connectToNodeBridge()
+  } else if (btn == "testBridge") {
+    log.debug "HubSpace Bridge: bridge test requested"
+    testNodeBridgeConnection()
+  } else if (btn == "disconnectBridge") {
+    log.debug "HubSpace Bridge: bridge disconnect requested"
+    state.nodeSessionId = null
+    log.info "Disconnected from Node.js bridge"
   }
 }
 
@@ -89,10 +114,22 @@ def updated()  { unschedule(); initialize() }
 
 def initialize() {
   log.debug "Initializing HubspaceDeviceManager"
-  if (!state.accessToken) {
-    log.info "Access token not found. Please authenticate with your HubSpace credentials."
-    return
+  
+  // Check if we should use bridge mode
+  if (settings.useNodeBridge) {
+    if (!state.nodeSessionId && settings.nodeBridgeUrl) {
+      log.info "Bridge mode enabled but not connected. Please connect to bridge server."
+      return
+    }
+    log.debug "Using Node.js bridge mode"
+  } else {
+    if (!state.accessToken) {
+      log.info "Access token not found. Please authenticate with your HubSpace credentials."
+      return
+    }
+    log.debug "Using direct API mode"
   }
+  
   discoverDevices()
   if (state.knownIds == null) state.knownIds = []
   schedule("*/${Math.max(15, pollSeconds)} * * * * ?", pollAll)
@@ -395,19 +432,104 @@ private discoverDevices() {
   refreshIndexAndDiscover()
 }
 
+private connectToNodeBridge() {
+  if (!settings.nodeBridgeUrl) {
+    log.warn "Bridge URL not configured"
+    return
+  }
+  
+  if (!settings.username || !settings.password) {
+    log.warn "HubSpace credentials required for bridge authentication"
+    return
+  }
+  
+  try {
+    def loginData = [
+      username: settings.username,
+      password: settings.password
+    ]
+    
+    log.debug "Connecting to Node.js bridge at: ${settings.nodeBridgeUrl}"
+    
+    httpPost([
+      uri: "${settings.nodeBridgeUrl}/login",
+      headers: ["Content-Type": "application/json"],
+      body: loginData,
+      timeout: 15
+    ]) { resp ->
+      if (resp.status == 200) {
+        def responseData = resp.data
+        state.nodeSessionId = responseData.sessionId
+        state.nodeBridgeAccountId = responseData.accountId
+        log.info "Successfully connected to Node.js bridge. Session ID: ${state.nodeSessionId}"
+      } else {
+        throw new Exception("Bridge login failed with status: ${resp.status}")
+      }
+    }
+  } catch (Exception e) {
+    log.error "Failed to connect to Node.js bridge: ${e.message}"
+    state.nodeSessionId = null
+  }
+}
+
+private testNodeBridgeConnection() {
+  if (!state.nodeSessionId || !settings.nodeBridgeUrl) {
+    log.warn "Bridge not connected or URL not configured"
+    return
+  }
+  
+  try {
+    httpGet([
+      uri: "${settings.nodeBridgeUrl}/devices",
+      params: [session: state.nodeSessionId],
+      timeout: 10
+    ]) { resp ->
+      if (resp.status == 200) {
+        def deviceCount = resp.data?.size() ?: 0
+        log.info "Bridge connection successful! Found ${deviceCount} devices."
+      } else {
+        throw new Exception("Bridge test failed with status: ${resp.status}")
+      }
+    }
+  } catch (Exception e) {
+    log.error "Bridge connection test failed: ${e.message}"
+    state.nodeSessionId = null
+  }
+}
+
 
 def pollAll() {
-  if (!checkAndRenewToken()) {
-    log.warn "Cannot poll devices - no valid access token"
-    return
+  if (settings.useNodeBridge) {
+    if (!state.nodeSessionId) {
+      log.warn "Cannot poll devices - no Node bridge session"
+      return
+    }
+  } else {
+    if (!checkAndRenewToken()) {
+      log.warn "Cannot poll devices - no valid access token"
+      return
+    }
   }
   getChildDevices()?.each { c -> pollChild(c) }
 }
 
 def pollChild(cd) {
   def devId = cd.deviceNetworkId - "hubspace-"
+  if (settings.useNodeBridge) {
+    try {
+      httpGet([
+        uri: "${settings.nodeBridgeUrl}/state/${devId}",
+        params: [session: state.nodeSessionId],
+        timeout: 10
+      ]) { resp ->
+        updateFromState(cd, resp.data)
+      }
+    } catch (Exception e) {
+      log.warn "Node bridge error polling device ${cd.displayName}: ${e.message}"
+    }
+    return
+  }
   if (!checkAndRenewToken()) return
-  
   try {
     def url = generateApiUrl("/v1/accounts/${state.accountId}/metadevices/${devId}/state")
     httpGet([
@@ -447,8 +569,32 @@ String driverForType(String t) {
 
 // Called by child driver commands
 def sendHsCommand(String devId, String cmd, Map args=[:]) {
+  if (settings.useNodeBridge) {
+    def values = [[functionClass: cmd, functionInstance: args.instance ?: null, value: args.value]]
+    try {
+      httpPost([
+        uri: "${settings.nodeBridgeUrl}/command/${devId}",
+        params: [session: state.nodeSessionId],
+        headers: ["Content-Type": "application/json; charset=utf-8"],
+        body: [values: values],
+        timeout: 10
+      ]) { resp ->
+        if (resp.status != 200) {
+          log.warn "Node bridge command failed: $cmd $args -> ${resp.data}"
+        } else {
+          log.debug "Node bridge command successful: $cmd $args"
+          def childDevice = getChildDevices().find { it.deviceNetworkId == "hubspace-${devId}" }
+          if (childDevice) {
+            runIn(2, "pollChild", [data: childDevice])
+          }
+        }
+      }
+    } catch (Exception e) {
+      log.error "Node bridge error sending command $cmd to device $devId: ${e.message}"
+    }
+    return
+  }
   if (!checkAndRenewToken()) return
-  
   def payload = [
     metadeviceId: devId,
     values: [
@@ -459,7 +605,6 @@ def sendHsCommand(String devId, String cmd, Map args=[:]) {
       ]
     ]
   ]
-  
   try {
     def url = generateApiUrl("/v1/accounts/${state.accountId}/metadevices/${devId}/state")
     httpPutJson([
@@ -477,7 +622,6 @@ def sendHsCommand(String devId, String cmd, Map args=[:]) {
         log.warn "Command failed: $cmd $args -> ${resp.data}"
       } else {
         log.debug "Command successful: $cmd $args"
-        // Poll the device to get updated state
         def childDevice = getChildDevices().find { it.deviceNetworkId == "hubspace-${devId}" }
         if (childDevice) {
           runIn(2, "pollChild", [data: childDevice])
@@ -547,27 +691,34 @@ private checkAndRenewToken() {
 }
 
 void refreshIndexAndDiscover() {
-  getAccountId()
+  if (!settings.useNodeBridge) { getAccountId() }
   // Ensure known set exists
   Set known = (state.knownIds ?: []) as Set
 
   // Get all devices from Hubspace API
   List allDevices = []
   try {
-    if (!checkAndRenewToken()) return
-    
-    def url = generateApiUrl("/v1/accounts/${state.accountId}/metadevices")
-    httpGet([
-      uri: url,
-      headers: [
-        "Authorization": "Bearer ${state.accessToken}",
-        // Use data host for metadevice list to match HubSpace client behavior
-        "Host": "semantics2.afero.net"
-      ],
-      params: ["expansions": "state"],
-      timeout: 15
-    ]) { resp ->
-      allDevices = resp?.data as List
+    if (settings.useNodeBridge) {
+      httpGet([
+        uri: "${settings.nodeBridgeUrl}/devices",
+        params: [session: state.nodeSessionId],
+        timeout: 15
+      ]) { resp -> allDevices = resp?.data as List }
+    } else {
+      if (!checkAndRenewToken()) return
+      def url = generateApiUrl("/v1/accounts/${state.accountId}/metadevices")
+      httpGet([
+        uri: url,
+        headers: [
+          "Authorization": "Bearer ${state.accessToken}",
+          // Use data host for metadevice list to match HubSpace client behavior
+          "Host": "semantics2.afero.net"
+        ],
+        params: ["expansions": "state"],
+        timeout: 15
+      ]) { resp ->
+        allDevices = resp?.data as List
+      }
     }
   } catch (Throwable t) {
     log.warn "Failed to retrieve devices from Hubspace API: ${t?.message}"
