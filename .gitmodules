@@ -1,6 +1,6 @@
 [submodule "tmp/aioafero"]
 	path = tmp/aioafero
 	url = https://github.com/Expl0dingBanana/aioafero
-[submodule "tmp/tmp/Hubspace-Homeassistant"]
-	path = tmp/tmp/Hubspace-Homeassistant
+[submodule "tmp/Hubspace-Homeassistant"]
+	path = tmp/Hubspace-Homeassistant
 	url = https://github.com/jdeath/Hubspace-Homeassistant
