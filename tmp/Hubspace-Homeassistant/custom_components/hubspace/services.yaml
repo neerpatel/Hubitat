@@ -1,0 +1,37 @@
+---
+send_command:
+  description: Send a Command To Hubspace Cloud
+  target:
+    entity:
+      integration: hubspace
+      domain:
+        - button
+        - climate
+        - fan
+        - light
+        - lock
+        - switch
+        - valve
+  fields:
+    account:
+      name: account
+      description: |
+        Username associated with the device. If not present, it will
+        use the first Hubspace instance
+      required: false
+      example: your.email@gmail.com
+    value:
+      name: value
+      description: value you want to send
+      required: true
+      example: "on"
+    function_class:
+      name: function_class
+      description: functionClass you want to send
+      required: true
+      example: "power"
+    function_instance:
+      name: function_instance
+      description: functionInstance you want to send
+      required: false
+      example: "primary"
