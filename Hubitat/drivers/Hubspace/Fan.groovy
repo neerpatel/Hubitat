@@ -7,6 +7,8 @@ metadata {
     capability "PresenceSensor"
     
     command "setDirection", ["string"] // forward, reverse
+
+    attribute "direction", "string"
   }
 }
 

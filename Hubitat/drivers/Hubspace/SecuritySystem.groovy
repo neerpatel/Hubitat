@@ -4,6 +4,7 @@ metadata {
     capability "SecurityKeypad"
     capability "Refresh"
     capability "PresenceSensor"
+    capability "Alarm"
     
     attribute "securitySystemStatus", "enum", ["disarmed", "armed home", "armed away", "armed night"]
     attribute "alarmStatus", "enum", ["off", "strobe", "siren", "both"]
@@ -13,6 +14,11 @@ metadata {
     command "armNight"
     command "disarm"
     command "setAlarmStatus", [[name:"status", type:"ENUM", constraints:["off", "strobe", "siren", "both"]]]
+    // Standard Alarm capability shortcuts
+    command "siren"
+    command "strobe"
+    command "both"
+    command "off"
   }
 }
 
@@ -48,6 +54,12 @@ def setAlarmStatus(status) {
   log.info "Setting alarm status to ${status} for ${device.displayName}"
   parent.sendHsCommand(id(), "alarm-status", [value: status])
 }
+
+// Alarm capability implementations
+def siren() { setAlarmStatus('siren') }
+def strobe() { setAlarmStatus('strobe') }
+def both()  { setAlarmStatus('both') }
+def off()   { setAlarmStatus('off') }
 
 private id() { 
   device.deviceNetworkId - "hubspace-" 

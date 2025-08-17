@@ -215,7 +215,8 @@ private submitLoginCredentials(String sessionCode, String execution, String tabI
   
   log.debug "Submitting login credentials to: ${loginUrl}"
   log.debug "Login parameters: ${loginParams}"
-  log.debug "Login data: ${loginData}"
+  // Do NOT log raw credentials
+  log.debug "Login data: [username:${settings.username}, password:***, credentialId:<hidden>]"
 
   httpPost([
     uri: loginUrl,
@@ -223,7 +224,7 @@ private submitLoginCredentials(String sessionCode, String execution, String tabI
     followRedirects: false,
     body: loginData,
     headers: headers,
-    textParser: true,
+    contentType: 'application/x-www-form-urlencoded',
     timeout: 20
   ]) { resp ->
     log.debug "Login response: ${resp.status} ${resp.data}"
@@ -268,6 +269,7 @@ private exchangeCodeForToken(String code, Map challenge) {
     uri: tokenUrl,
     body: tokenData,
     headers: headers,
+    contentType: 'application/x-www-form-urlencoded',
     timeout: 20
   ]) { resp ->
     if (resp.status == 200) {
@@ -312,6 +314,7 @@ private refreshAccessToken() {
       uri: tokenUrl,
       body: tokenData,
       headers: headers,
+      contentType: 'application/x-www-form-urlencoded',
       timeout: 20
     ]) { resp ->
       if (resp.status == 200) {
@@ -468,7 +471,9 @@ private getAccountId() {
         ], 
         timeout: 10
       ]) { resp ->
-        resp.raise_for_status()
+        if (resp.status != 200) {
+          throw new Exception("Failed to get account ID: ${resp.status}")
+        }
         def jsonData = resp.data
         if (!jsonData?.accountAccess || jsonData.accountAccess.size() == 0) {
           throw new Exception("No account ID found")
@@ -597,6 +602,12 @@ private processStateValue(cd, String functionClass, String functionInstance, val
     case "color-temperature":
       cd.sendEvent(name: "colorTemperature", value: (value as int))
       break
+    case "color-mode":
+      // Map HubSpace color modes to Hubitat colorMode values
+      def cm = (value as String)
+      def hubitatMode = (cm == 'color') ? 'RGB' : ((cm == 'white') ? 'CT' : cm)
+      cd.sendEvent(name: "colorMode", value: hubitatMode)
+      break
     case "color-rgb":
       if (value instanceof Map) {
         def rgb = value
@@ -612,6 +623,9 @@ private processStateValue(cd, String functionClass, String functionInstance, val
         cd.sendEvent(name: "speed", value: (value as String))
       }
       break
+    case "fan-direction":
+      cd.sendEvent(name: "direction", value: value as String)
+      break
     case "lock":
       cd.sendEvent(name: "lock", value: value == "locked" ? "locked" : "unlocked")
       break
@@ -624,11 +638,20 @@ private processStateValue(cd, String functionClass, String functionInstance, val
     case "auto-off-timer":
       cd.sendEvent(name: "autoOffTimer", value: value as int)
       break
+    case "timer-duration":
+      // Water timer duration setting
+      cd.sendEvent(name: "duration", value: value as int)
+      break
     case "motion-action":
       cd.sendEvent(name: "motionAction", value: value as String)
       break
     case "sensitivity":
       cd.sendEvent(name: "sensitivity", value: value as String)
+      break
+    case "alarm-status":
+      // Raise both custom and standard Alarm capability events
+      cd.sendEvent(name: "alarmStatus", value: value as String)
+      cd.sendEvent(name: "alarm", value: value as String)
       break
     case "temperature":
       if (functionInstance == "current-temp") {

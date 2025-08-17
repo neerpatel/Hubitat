@@ -11,6 +11,7 @@ metadata {
     attribute "remainingTime", "number"
     
     command "setDuration", [[name:"duration", type:"NUMBER", description:"Timer duration in minutes"]]
+    command "startWithDuration", [[name:"duration", type:"NUMBER", description:"Start watering with duration in minutes"]]
   }
 }
 
@@ -38,6 +39,11 @@ def off() { close() }
 def setDuration(duration) {
   log.info "Setting duration to ${duration} minutes for ${device.displayName}"
   parent.sendHsCommand(id(), "timer-duration", [value: duration as int])
+}
+
+def startWithDuration(duration) {
+  setDuration(duration)
+  open()
 }
 
 private id() { 
