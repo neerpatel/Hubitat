@@ -14,11 +14,12 @@ metadata {
 }
 
 def initialize() {
-  log.debug "Initializing HubSpace Light"
+    log.debug "Initializing HubSpace Light"
+    refresh()
 }
 
-def refresh() { 
-  parent.pollChild(device) 
+def refresh() {
+    parent.pollChild(device)
 }
 
 def on() { 
@@ -96,6 +97,6 @@ private Map hubitatColorToRgb(Map color) {
   ]
 }
 
-private id() { 
-  device.deviceNetworkId - "hubspace-" 
+private id() {
+  device.deviceNetworkId - "hubspace-"
 }

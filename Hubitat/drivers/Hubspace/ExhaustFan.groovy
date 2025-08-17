@@ -8,7 +8,10 @@ metadata {
     }
 }
 
-def initialize() { }
+def initialize() {
+    log.debug "Initializing HubSpace Exhaust Fan"
+    refresh()
+}
 def refresh() { parent.pollChild(device) }
 
 // Commands for numbers (e.g., auto-off-timer)
@@ -21,4 +24,6 @@ def setSelect(functionClass, functionInstance, value) {
     parent.sendHsCommand(id(), functionClass, [instance: functionInstance, value: value])
 }
 
-private id() { device.deviceNetworkId - 'hubspace-' }
+private id() {
+  device.deviceNetworkId - "hubspace-"
+}

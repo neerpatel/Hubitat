@@ -15,7 +15,10 @@ metadata {
     }
 }
 
-def initialize() { }
+def initialize() {
+    log.debug "Initializing HubSpace Thermostat"
+    refresh()
+}
 def refresh() { parent.pollChild(device) }
 
 def setHeatingSetpoint(temperature) {
@@ -48,4 +51,6 @@ def setSafetyMinTemp(temperature) {
     parent.sendHsCommand(id(), "temperature", [instance: "safety-mode-min-temp", value: temperature as float])
 }
 
-private id() { device.deviceNetworkId - 'hubspace-' }
+private id() {
+  device.deviceNetworkId - "hubspace-"
+}

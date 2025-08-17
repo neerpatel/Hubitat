@@ -11,7 +11,10 @@ metadata {
     }
 }
 
-def initialize() { }
+def initialize() {
+    log.debug "Initializing HubSpace Portable AC"
+    refresh()
+}
 def refresh() { parent.pollChild(device) }
 
 def setCoolingSetpoint(temperature) {
@@ -30,4 +33,6 @@ def setSleepMode(mode) {
     parent.sendHsCommand(id(), "sleep", [value: mode])
 }
 
-private id() { device.deviceNetworkId - 'hubspace-' }
+private id() {
+  device.deviceNetworkId - "hubspace-"
+}

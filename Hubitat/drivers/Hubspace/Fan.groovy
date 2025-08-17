@@ -12,10 +12,11 @@ metadata {
 
 def initialize() {
   log.debug "Initializing HubSpace Fan"
+  refresh()
 }
 
-def refresh() { 
-  parent.pollChild(device) 
+def refresh() {
+  parent.pollChild(device)
 }
 
 def on() { 
@@ -88,6 +89,6 @@ def setDirection(direction) {
   parent.sendHsCommand(id(), "fan-direction", [value: direction])
 }
 
-private id() { 
-  device.deviceNetworkId - "hubspace-" 
+private id() {
+  device.deviceNetworkId - "hubspace-"
 }

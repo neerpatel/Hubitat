@@ -19,11 +19,12 @@ metadata {
 }
 
 def initialize() {
-  log.debug "Initializing HubSpace Security System Sensor"
+    log.debug "Initializing HubSpace Security System Sensor"
+    refresh()
 }
 
-def refresh() { 
-  parent.pollChild(device) 
+def refresh() {
+    parent.pollChild(device)
 }
 
 def setTriggerMode(mode) {
@@ -74,6 +75,6 @@ private getTriggerValue(mode) {
   }
 }
 
-private id() { 
-  device.deviceNetworkId - "hubspace-" 
+private id() {
+  device.deviceNetworkId - "hubspace-"
 }

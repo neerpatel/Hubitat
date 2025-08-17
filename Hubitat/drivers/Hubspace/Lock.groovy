@@ -13,10 +13,11 @@ metadata {
 
 def initialize() {
   log.debug "Initializing HubSpace Lock"
+  refresh()
 }
 
-def refresh() { 
-  parent.pollChild(device) 
+def refresh() {
+  parent.pollChild(device)
 }
 
 def lock() { 
@@ -29,6 +30,6 @@ def unlock() {
   parent.sendHsCommand(id(), "lock", [value: "unlocked"]) 
 }
 
-private id() { 
-  device.deviceNetworkId - "hubspace-" 
+private id() {
+  device.deviceNetworkId - "hubspace-"
 }

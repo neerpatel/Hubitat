@@ -18,10 +18,11 @@ metadata {
 
 def initialize() {
   log.debug "Initializing HubSpace Security System"
+  refresh()
 }
 
-def refresh() { 
-  parent.pollChild(device) 
+def refresh() {
+  parent.pollChild(device)
 }
 
 def armHome() {
@@ -49,6 +50,6 @@ def setAlarmStatus(status) {
   parent.sendHsCommand(id(), "alarm-status", [value: status])
 }
 
-private id() { 
-  device.deviceNetworkId - "hubspace-" 
+private id() {
+  device.deviceNetworkId - "hubspace-"
 }

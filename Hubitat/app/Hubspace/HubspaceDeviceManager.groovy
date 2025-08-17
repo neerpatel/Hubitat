@@ -90,9 +90,15 @@ def updated()  { unschedule(); initialize() }
 def initialize() {
   log.debug "Initializing HubspaceDeviceManager"
   if (!state.accessToken) {
-    log.info "Access token not found. Please authenticate with your HubSpace credentials."
-    return
+    if (settings.username && settings.password) {
+      log.info "Access token not found. Attempting initial HubSpace connection"
+      performWebAppLogin()
+    } else {
+      log.info "Access token not found. Please authenticate with your HubSpace credentials."
+      return
+    }
   }
+  getAccountId()
   discoverDevices()
   if (state.knownIds == null) state.knownIds = []
   schedule("*/${Math.max(15, pollSeconds)} * * * * ?", pollAll)
@@ -466,7 +472,9 @@ private getAccountId() {
         ], 
         timeout: 10
       ]) { resp ->
-        resp.raise_for_status()
+        if (resp.status != 200) {
+          throw new Exception("Failed to retrieve account ID: ${resp.status}")
+        }
         def jsonData = resp.data
         if (!jsonData?.accountAccess || jsonData.accountAccess.size() == 0) {
           throw new Exception("No account ID found")

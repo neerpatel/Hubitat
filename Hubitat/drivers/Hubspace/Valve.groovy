@@ -16,10 +16,11 @@ metadata {
 
 def initialize() {
   log.debug "Initializing HubSpace Valve"
+  refresh()
 }
 
-def refresh() { 
-  parent.pollChild(device) 
+def refresh() {
+  parent.pollChild(device)
 }
 
 def open() { 
@@ -40,6 +41,6 @@ def setDuration(duration) {
   parent.sendHsCommand(id(), "timer-duration", [value: duration as int])
 }
 
-private id() { 
-  device.deviceNetworkId - "hubspace-" 
+private id() {
+  device.deviceNetworkId - "hubspace-"
 }
