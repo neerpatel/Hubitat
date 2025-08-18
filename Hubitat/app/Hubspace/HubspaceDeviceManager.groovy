@@ -21,6 +21,9 @@ definition(
 
 preferences {
   page(name: "mainPage")
+  page(name: "addDevicesPage")
+  page(name: "addDevStatus")
+  page(name: "listDevices")
 }
 
 def mainPage() {
@@ -56,6 +59,11 @@ def mainPage() {
       if (getChildDevices()?.size() > 0) {
         paragraph "Discovered devices: ${getChildDevices().size()}"
       }
+    }
+    section("Device Discovery & Add") {
+      paragraph "Use the bridge to discover HubSpace devices, then select which to add."
+      href "addDevicesPage", title: "Discover and Add Devices", description: "Scan via bridge and choose devices to install"
+      href "listDevices", title: "List Discovered Devices", description: "Show discovered devices and install state"
     }
   }
 }
@@ -93,6 +101,7 @@ def initialize() {
     return
   }
   
+  // Seed discovery list on init so the Add Devices page has content
   discoverDevices()
   if (state.knownIds == null) state.knownIds = []
   schedule("*/${Math.max(15, pollSeconds)} * * * * ?", pollAll)
@@ -100,288 +109,6 @@ def initialize() {
   schedule("*/${Math.max(30, (settings.healthSeconds ?: 120) as int)} * * * * ?", healthCheck)
 }
 
-private performWebAppLogin() {
-  log.debug "Starting HubSpace authentication flow"
-  try {
-    // Generate PKCE challenge
-    def challenge = generateChallengeData()
-    
-    // Step 1: Get the authorization page to extract session info
-    def authUrl = generateAuthUrl("/protocol/openid-connect/auth")
-    def codeParams = [
-      "response_type": "code",
-      "client_id": "hubspace_android",
-      "redirect_uri": "hubspace-app://loginredirect",
-      "scope": "openid offline_access",
-      "code_challenge": challenge.challenge,
-      "code_challenge_method": "S256"
-    ]
-    
-    log.debug "Getting auth page: ${authUrl} with params: ${codeParams}"
-    
-    def cookieHeader = null
-    httpGet([
-      uri: authUrl,
-      query: codeParams,
-      followRedirects: false,
-      textParser: true,
-      contentType: "text/html",
-      headers: [
-        "User-Agent": "Dart/3.1 (dart:io)",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
-      ],
-      timeout: 20
-    ]) { resp ->
-      if (resp.status != 200) {
-        throw new Exception("Failed to get auth page: ${resp.status}")
-      }
-      def html = resp.data.text
-
-      // Capture cookies from the auth page to include in subsequent POST
-      try {
-        def cookies = []
-        resp.headers?.each { k, v ->
-          if (k?.toString()?.equalsIgnoreCase('Set-Cookie')) {
-            // Only send cookie name=value
-            def nv = v?.value?.toString()?.tokenize(';')?.getAt(0)
-            if (nv) cookies << nv
-          }
-        }
-        if (cookies) {
-          cookieHeader = cookies.unique().join('; ')
-          state._authCookies = cookieHeader
-          log.debug "Captured ${cookies.size()} cookies from auth page"
-        } else {
-          state._authCookies = null
-        }
-      } catch (ignored) {
-        // Ignore cookie parse errors; continue without cookies
-      }
- 
-        // Try to find the login form action URL
-      def formAction = extractFromHtml(html, '<form[^>]*id=["\']kc-form-login["\'][^>]*action=["\']([^"\']*)["\']') ?:
-                      extractFromHtml(html, '<form[^>]*action=["\']([^"\']*)["\'][^>]*id=["\']kc-form-login["\']') ?:
-                      extractFromHtml(html, 'action=["\']([^"\']*login-actions/authenticate[^"\']*)["\']')
-      
-      // Decode HTML entities (matching shell script behavior)
-      if (formAction) {
-        formAction = formAction.replace('&amp;', '&')
-      }
-      
-      log.debug "Found form action: ${formAction}"
-
-      // Extract session_code, execution, tab_id from formAction URL if present
-      def sessionCode = formAction =~ /session_code=([^&]*)/ ? (formAction =~ /session_code=([^&]*)/)[0][1] : null
-      def execution = formAction =~ /execution=([^&]*)/ ? (formAction =~ /execution=([^&]*)/)[0][1] : null
-      def tabId = formAction =~ /tab_id=([^&]*)/ ? (formAction =~ /tab_id=([^&]*)/)[0][1] : null
-
-      // Fallback to extracting from HTML if not found in formAction
-      if (!sessionCode) sessionCode = extractFromHtml(html, 'name="session_code" value="([^"]*)"')
-      if (!execution) execution = extractFromHtml(html, 'name="execution" value="([^"]*)"')
-      if (!tabId) tabId = extractFromHtml(html, 'name="tab_id" value="([^"]*)"')
-      log.debug "Extracted auth page parameters: sessionCode=${sessionCode}, execution=${execution}, tabId=${tabId}"
-      if (!sessionCode || !execution || !tabId) {
-        throw new Exception("Failed to extract session parameters from auth page")
-      }
-      
-      //log.debug "Extracted session parameters: sessionCode=${sessionCode}, execution=${execution}, tabId=${tabId}"
-      
-      // Step 2: Submit login credentials using the extracted form action URL
-      submitLoginCredentials(formAction, challenge)
-    }
-  } catch (Exception e) {
-    log.error "Authentication failed: ${e.message}"
-    state.accessToken = null
-  }
-}
-
-private generateChallengeData() {
-  log.debug "Generating PKCE challenge data"
-  
-  // Generate code verifier - 40 random bytes, base64url encoded (matching shell script)
-  def random = new Random()
-  def bytes = new byte[40]
-  random.nextBytes(bytes)
-  
-  // Base64 encode, then convert to base64url format and remove any non-alphanumeric chars
-  def codeVerifier = bytes.encodeBase64().toString()
-    .replace('+', '-')
-    .replace('/', '_')
-    .replace('=', '')
-    .replaceAll('[^a-zA-Z0-9\\-_]', '')
-  
-  // Generate code challenge - SHA256 hash of verifier, base64url encoded
-  def digest = java.security.MessageDigest.getInstance("SHA-256")
-  def hash = digest.digest(codeVerifier.getBytes("UTF-8"))
-  
-  def codeChallenge = hash.encodeBase64().toString()
-    .replace('+', '-')
-    .replace('/', '_')
-    .replace('=', '')
-  
-  log.debug "Generated PKCE challenge: verifier length=${codeVerifier.length()}, challenge length=${codeChallenge.length()}"
-  
-  return [
-    challenge: codeChallenge,
-    verifier: codeVerifier
-  ]
-}
-
-private submitLoginCredentials(String loginUrl, Map challenge) {
-  // Use the form action URL directly (as extracted from the auth page)
-  log.debug "Using form action URL: ${loginUrl}"
-  
-  // Body data only contains credentials (matching shell script format)
-  def loginData = [
-    "username": settings.username,
-    "password": settings.password,
-    "credentialId": ""
-  ]
-  
-  def headers = [
-    "Content-Type": "application/x-www-form-urlencoded",
-    "User-Agent": "Dart/3.1 (dart:io)",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
-  ]
-  // Include cookies from the auth GET if present
-  if (state._authCookies) {
-    headers["Cookie"] = state._authCookies
-    // Optional Referer for stricter IdP enforcement
-    headers["Referer"] = generateAuthUrl("/protocol/openid-connect/auth")
-  }
-  
-  log.debug "Submitting login credentials to: ${loginUrl}"
-  // Do NOT log raw credentials
-  log.debug "Login data: [username:${settings.username}, password:***, credentialId:<hidden>]"
-
-  httpPost([
-    uri: loginUrl,
-    followRedirects: false,
-    body: loginData,
-    headers: headers,
-    contentType: 'application/x-www-form-urlencoded',
-    timeout: 20
-  ]) { resp ->
-    log.debug "Login response: ${resp.status} ${resp.data}"
-    if (resp.status == 302 || resp.status == 200) {
-      // Check for redirect with authorization code
-      def location = resp.headers["Location"]?.value
-      if (location && location.contains("code=")) {
-        def code = extractAuthCode(location)
-        if (code) {
-          log.debug "Successfully extracted authorization code"
-          exchangeCodeForToken(code, challenge)
-        } else {
-          throw new Exception("Failed to extract authorization code from redirect")
-        }
-      } else {
-        throw new Exception("No authorization code in response")
-      }
-    } else {
-      throw new Exception("Login failed with status: ${resp.status}")
-    }
-  }
-}
-
-private exchangeCodeForToken(String code, Map challenge) {
-  def tokenUrl = generateAuthUrl("/protocol/openid-connect/token")
-  def tokenData = [
-    "grant_type": "authorization_code",
-    "client_id": "hubspace_android",
-    "redirect_uri": "hubspace-app://loginredirect",
-    "code": code,
-    "code_verifier": challenge.verifier
-  ]
-  
-  def headers = [
-    "Content-Type": "application/x-www-form-urlencoded",
-    "User-Agent": "Dart/3.1 (dart:io)",
-    "Accept": "application/json",
-    "Host": "accounts.hubspaceconnect.com"
-  ]
-  
-  log.debug "Exchanging code for token at: ${tokenUrl}"
-
-  httpPost([
-    uri: tokenUrl,
-    body: tokenData,
-    headers: headers,
-    contentType: 'application/x-www-form-urlencoded',
-    timeout: 20
-  ]) { resp ->
-    if (resp.status == 200) {
-      def tokenResponse = resp.data
-      state.accessToken = tokenResponse.access_token
-      state.refreshToken = tokenResponse.refresh_token
-      state.tokenExpires = now() + (tokenResponse.expires_in * 1000)
-      
-      log.info "Successfully obtained access token, expires in ${tokenResponse.expires_in} seconds"
-      
-      // Test the token and discover devices
-      getAccountId()
-      discoverDevices()
-    } else {
-      throw new Exception("Token exchange failed with status: ${resp.status}")
-    }
-  }
-}
-
-private refreshAccessToken() {
-  if (!state.refreshToken) {
-    log.warn "No refresh token available"
-    return false
-  }
-  
-  def tokenUrl = generateAuthUrl("/protocol/openid-connect/token")
-  def tokenData = [
-    "grant_type": "refresh_token",
-    "client_id": "hubspace_android",
-    "refresh_token": state.refreshToken
-  ]
-  
-  def headers = [
-    "Content-Type": "application/x-www-form-urlencoded",
-    "User-Agent": "Dart/3.1 (dart:io)",
-    "Accept": "application/json",
-    "Host": "accounts.hubspaceconnect.com"
-  ]
-  
-  log.debug "Refreshing access token"
-  
-  try {
-    httpPost([
-      uri: tokenUrl,
-      body: tokenData,
-      headers: headers,
-      contentType: 'application/x-www-form-urlencoded',
-      timeout: 20
-    ]) { resp ->
-      if (resp.status == 200) {
-        def tokenResponse = resp.data
-        state.accessToken = tokenResponse.access_token
-        if (tokenResponse.refresh_token) {
-          state.refreshToken = tokenResponse.refresh_token
-        }
-        state.tokenExpires = now() + (tokenResponse.expires_in * 1000)
-        
-        log.info "Successfully refreshed access token"
-        return true
-      } else {
-        throw new Exception("Token refresh failed with status: ${resp.status}")
-      }
-    }
-  } catch (Exception e) {
-    log.error "Error refreshing token: ${e.message}"
-    state.accessToken = null
-    state.refreshToken = null
-    return false
-  }
-}
-
-private generateAuthUrl(String endpoint) {
-  endpoint = endpoint.startsWith("/") ? endpoint.substring(1) : endpoint
-  return "https://accounts.hubspaceconnect.com/auth/realms/thd/${endpoint}"
-}
 
 private extractFromHtml(String html, String pattern) {
   def matcher = html =~ pattern
@@ -393,9 +120,7 @@ private extractAuthCode(String url) {
   return matcher ? java.net.URLDecoder.decode(matcher[0][1], "UTF-8") : null
 }
 
-private discoverDevices() {
-  refreshIndexAndDiscover()
-}
+private discoverDevices() { refreshIndexAndDiscover() }
 
 private connectToNodeBridge() {
   if (!settings.nodeBridgeUrl) {
@@ -560,20 +285,13 @@ def sendHsCommand(String devId, String cmd, Map args=[:]) {
   }
 }
 
-// Deprecated: direct cloud API disabled; bridge handles API URL generation
-private generateApiUrl(String endpoint) { return "" }
 
-// Deprecated: direct cloud API disabled; accountId comes from Node bridge login
-private getAccountId() { }
-
-// Deprecated: direct cloud API disabled; bridge manages auth
-private checkAndRenewToken() { false }
 
 void refreshIndexAndDiscover() {
-  // Ensure known set exists
-  Set known = (state.knownIds ?: []) as Set
+  // Maintain a discovery cache similar to Kasa app's state.devices
+  Map<String, Map> disc = state.devices ?: [:]
 
-  // Get all devices from Hubspace API
+  // Get all devices from Hubspace via Node bridge
   List allDevices = []
   try {
     log.info "[NodeBridge] GET /devices"
@@ -583,21 +301,18 @@ void refreshIndexAndDiscover() {
       timeout: 15
     ]) { resp ->
       log.debug "[NodeBridge] devices status=${resp.status} count=${resp?.data?.size()}"
-      allDevices = resp?.data as List
+      allDevices = (resp?.data as List) ?: []
     }
   } catch (Throwable t) {
     log.warn "Failed to retrieve devices from Hubspace API: ${t?.message}"
     return
   }
 
-  // Process discovered devices
+  // Normalize and cache
   allDevices.each { Map d ->
-    // Shape can vary by endpoint/expansion.
     String typeId = (d.typeId ?: d.type)?.toString()
-    if (typeId && typeId != 'metadevice.device') {
-      // Skip rooms, groups, home containers, etc.
-      return
-    }
+    if (typeId && typeId != 'metadevice.device') { return }
+
     String id = (d.id ?: d.deviceId ?: d.metadeviceId ?: d.device_id)?.toString()
     String type = (
       d.device_class ?: d?.description?.device?.deviceClass ?: d?.description?.deviceClass
@@ -605,57 +320,161 @@ void refreshIndexAndDiscover() {
     String name = (
       d.friendlyName ?: d.friendly_name ?: d?.description?.device?.friendlyName ?: d.default_name ?: (id ? "HubSpace ${id}" : null)
     )?.toString()
-    if (!id || !type) return
+    if (!id || !type) { return }
 
-    if (!known.contains(id)) {
-      String dni = "hubspace-${id}"
-      String driver = driverForType(type)
-      def child = getChildDevice(dni) ?: addChildDevice(
+    String dni = "hubspace-${id}"
+    disc[dni] = [
+      dni: dni,
+      id: id,
+      type: type,
+      name: name ?: dni,
+      raw: d
+    ]
+  }
+
+  state.devices = disc
+}
+
+// ===== Kasa-style Add Devices Flow (adapted for HubSpace bridge) =====
+def addDevicesPage() {
+  log.debug "addDevicesPage: begin"
+  // Always refresh discovery cache on entry
+  refreshIndexAndDiscover()
+
+  Map devices = state.devices ?: [:]
+  Map uninstalled = [:]
+  devices.each { k, v ->
+    def child = getChildDevice(k)
+    if (!child) {
+      uninstalled[k] = "${v.name ?: v.id}, ${v.type}"
+    }
+  }
+
+  return dynamicPage(name: "addDevicesPage",
+                     title: "Add HubSpace Devices to Hubitat",
+                     nextPage: "addDevStatus",
+                     install: false) {
+    section() {
+      paragraph "Select devices to add. This page refreshes each time you open it."
+      input(name: "selectedAddDevices", type: "enum", title: "Devices to add (${uninstalled.size() ?: 0} available)",
+            multiple: true, required: false, options: uninstalled)
+    }
+  }
+}
+
+def addDevStatus() {
+  addDevices()
+  def addMsg = new StringBuilder()
+  def failMsg = new StringBuilder()
+  if (!state.addedDevices) {
+    addMsg << "Added Devices: No devices added."
+  } else {
+    addMsg << "<b>The following devices were installed:</b>\n"
+    state.addedDevices.each { addMsg << "\t${it}\n" }
+  }
+  if (state.failedAdds) {
+    failMsg << "<b>The following devices were not installed:</b>\n"
+    state.failedAdds.each { failMsg << "\t${it}\n" }
+  }
+  return dynamicPage(name: "addDevStatus",
+                     title: "Installation Status",
+                     nextPage: "listDevices",
+                     install: false) {
+    section() {
+      paragraph addMsg.toString()
+      paragraph failMsg.toString()
+    }
+  }
+}
+
+def addDevices() {
+  log.info "addDevices: selected=${settings.selectedAddDevices}"
+  state.addedDevices = []
+  state.failedAdds = []
+  def devices = state.devices ?: [:]
+  (settings.selectedAddDevices ?: []).each { String dni ->
+    def child = getChildDevice(dni)
+    if (child) { return }
+    def rec = devices[dni]
+    if (!rec) { state.failedAdds << [dni: dni, reason: 'not in discovery']; return }
+    try {
+      String driver = driverForType(rec.type as String)
+      def added = addChildDevice(
         "neerpatel/hubspace",
         driver,
         dni,
-        [label: name, isComponent: false]
+        [label: rec.name ?: dni, isComponent: false]
       )
-      child?.updateDataValue("hsType", type as String)
-      known << id
-      log.debug "Discovered: ${name} (${type}) id=${id}"
+      added?.updateDataValue("hsType", rec.type as String)
+      state.addedDevices << [label: rec.name, id: rec.id]
+      log.info "Installed ${rec.name} (${rec.type})"
+    } catch (Throwable t) {
+      state.failedAdds << [label: rec?.name, driver: rec?.type, id: rec?.id, error: t?.message]
+      log.warn "Failed to add ${rec?.name}: ${t?.message}"
+    }
+    pauseExecution(250)
+  }
+  app?.removeSetting("selectedAddDevices")
+}
+
+def listDevices() {
+  log.debug "listDevices"
+  Map devices = state.devices ?: [:]
+  List lines = []
+  devices.keySet().sort().each { String dni ->
+    def rec = devices[dni]
+    def installed = getChildDevice(dni) ? 'Yes' : 'No'
+    lines << "<b>${rec.name} - ${rec.type}</b>: [id: ${rec.id}, installed: ${installed}]"
+  }
+  return dynamicPage(name: "listDevices",
+                     title: "Discovered HubSpace Devices",
+                     nextPage: "mainPage",
+                     install: false) {
+    section() {
+      paragraph "<b>Total HubSpace devices: ${devices.size() ?: 0}</b>\n<b>Alias: [id, Installed?]</b>"
+      paragraph "<p style='font-size:14px'>${lines.join('\n')}</p>"
     }
   }
-
-  // Remove devices that are no longer in Hubspace
-  def currentChildDevices = getChildDevices()
-  currentChildDevices.each { cd ->
-    String id = cd.deviceNetworkId - "hubspace-"
-    if (!allDevices.find { it.id == id }) {
-      log.debug "Removing device no longer in Hubspace: ${cd.displayName} (${id})"
-      deleteChildDevice(cd.deviceNetworkId)
-      known.remove(id)
-    }
-  }
-
-  state.knownIds = known as List
 }
 
 private updateFromState(cd, Map deviceData) {
-  // Handle both direct state values and states array format
-  def states = deviceData.states ?: deviceData
-  if (!states) return
+  // Normalize various response shapes from the bridge
+  if (!deviceData) return
 
-  // If states is a list, process each state
-  if (states instanceof List) {
-    states.each { state ->
-      processStateValue(cd, state.functionClass, state.functionInstance, state.value)
+  // Common shapes observed: { states: [...] }, { values: [...] }, or flat map of fc->value
+  def listStates = null
+  if (deviceData.states instanceof List) {
+    listStates = deviceData.states
+  } else if (deviceData.values instanceof List) {
+    listStates = deviceData.values
+  }
+
+  if (listStates instanceof List) {
+    listStates.each { st ->
+      if (st instanceof Map) {
+        processStateValue(cd, st.functionClass as String, st.functionInstance as String, st.value)
+      }
     }
-  } else {
-    // Handle direct state object format
-    states.each { key, value ->
-      processStateValue(cd, key, null, value)
+    return
+  }
+
+  // Fallback: treat entries as key/value pairs but ignore non-state metadata
+  def ignoreKeys = [
+    'id','metadeviceId','name','type','friendlyName','friendly_name','device_class','description',
+    'lastUpdateTime','accountId','deviceId','device_id','typeId'
+  ] as Set
+  deviceData.each { k, v ->
+    if (!ignoreKeys.contains(k as String)) {
+      processStateValue(cd, k as String, null, v)
     }
   }
 }
 
 private processStateValue(cd, String functionClass, String functionInstance, value) {
   switch (functionClass) {
+    case "values":
+      // Already handled at caller; ignore to avoid log noise
+      break
     case "power":
       cd.sendEvent(name: "switch", value: value == "on" ? "on" : "off")
       break
@@ -733,6 +552,54 @@ private processStateValue(cd, String functionClass, String functionInstance, val
       break
     case "available":
       cd.sendEvent(name: "presence", value: value ? "present" : "not present")
+      break
+    case "visible":
+      cd.sendEvent(name: "visible", value: value as String)
+      break
+    case "direct":
+      cd.sendEvent(name: "direct", value: value as String)
+      break
+    case "wifi-ssid":
+      cd.sendEvent(name: "ssid", value: value as String)
+      break
+    case "wifi-rssi":
+      try { cd.sendEvent(name: "rssi", value: (value as int)) } catch (ignored) { cd.sendEvent(name: "rssi", value: value as String) }
+      break
+    case "wifi-steady-state":
+      cd.sendEvent(name: "wifiState", value: value as String)
+      break
+    case "wifi-setup-state":
+      cd.sendEvent(name: "wifiSetupState", value: value as String)
+      break
+    case "wifi-mac-address":
+      cd.sendEvent(name: "wifiMac", value: value as String)
+      break
+    case "geo-coordinates":
+      def lat = null; def lon = null
+      try {
+        def gc = value?.get('geo-coordinates') ?: value
+        lat = (gc?.latitude as BigDecimal)
+        lon = (gc?.longitude as BigDecimal)
+      } catch (ignored) {}
+      if (lat != null && lon != null) {
+        cd.sendEvent(name: "latitude", value: lat)
+        cd.sendEvent(name: "longitude", value: lon)
+        cd.sendEvent(name: "location", value: "${lat},${lon}")
+      } else {
+        cd.sendEvent(name: "location", value: value?.toString())
+      }
+      break
+    case "scheduler-flags":
+      cd.sendEvent(name: "schedulerFlags", value: value as String)
+      break
+    case "error-flag":
+      // Emit a per-instance boolean flag and an aggregate status
+      def inst = (functionInstance ?: 'error')?.toString().replace('-', '_')
+      cd.sendEvent(name: inst, value: (value?.toString()))
+      // Optional: if any error flag is true, set healthStatus = error
+      if (value == true || value?.toString() == 'true') {
+        cd.sendEvent(name: 'healthStatus', value: 'error')
+      }
       break
     case "battery-level":
       cd.sendEvent(name: "battery", value: value as int)

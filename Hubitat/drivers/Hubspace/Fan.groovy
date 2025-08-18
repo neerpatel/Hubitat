@@ -3,6 +3,7 @@ metadata {
     capability "Initialize"
     capability "Switch"
     capability "FanControl"
+    capability "Actuator"
     capability "Refresh"
     capability "PresenceSensor"
     

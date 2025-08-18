@@ -2,6 +2,7 @@ metadata {
   definition(name: "HubSpace Switch", namespace: "neerpatel/hubspace", author: "Neer Patel") {
     capability "Initialize"
     capability "Switch"
+    capability "Actuator"
     capability "Refresh"
   }
 }

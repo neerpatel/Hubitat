@@ -5,6 +5,7 @@ metadata {
     capability "Switch Level"
     capability "ColorTemperature"
     capability "Color Control"
+    capability "Actuator"
     capability "Refresh"
     capability "PresenceSensor"
   }
