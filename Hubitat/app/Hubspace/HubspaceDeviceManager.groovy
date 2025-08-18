@@ -39,6 +39,15 @@ def mainPage() {
         input name: "connectBridge", type: "button", title: "Connect to Bridge"
       }
     }
+    section("Health Monitoring") {
+      input "healthSeconds", "number", title: "Health check interval (sec)", defaultValue: 120, required: true
+      def h = state.bridgeHealth ?: [:]
+      def stamp = h.last ? new Date(h.last) : 'never'
+      def status = h.status ?: 'unknown'
+      def extra = (h.status == 'ok') ? "uptime=${h.uptime}s sessions=${h.sessions} version=${h.version}" : (h.error ?: '')
+      paragraph "Bridge Health: ${status} (${extra})\nLast checked: ${stamp}"
+      input name: "checkHealth", type: "button", title: "Check Health Now"
+    }
     section("Polling") {
       input "pollSeconds", "number", title: "Poll interval (sec)", defaultValue: 30, required: true
     }
@@ -68,6 +77,9 @@ void appButtonHandler(String btn) {
     log.debug "HubSpace Bridge: bridge disconnect requested"
     state.nodeSessionId = null
     log.info "Disconnected from Node.js bridge"
+  } else if (btn == "checkHealth") {
+    log.debug "HubSpace Bridge: health check requested"
+    healthCheck(true)
   }
 }
 
@@ -84,6 +96,8 @@ def initialize() {
   discoverDevices()
   if (state.knownIds == null) state.knownIds = []
   schedule("*/${Math.max(15, pollSeconds)} * * * * ?", pollAll)
+  // Health monitor
+  schedule("*/${Math.max(30, (settings.healthSeconds ?: 120) as int)} * * * * ?", healthCheck)
 }
 
 private performWebAppLogin() {
@@ -445,6 +459,38 @@ private testNodeBridgeConnection() {
 }
 
 
+def healthCheck(force=false) {
+  if (!settings.nodeBridgeUrl) return
+  try {
+    httpGet([
+      uri: "${settings.nodeBridgeUrl}/health",
+      timeout: 10
+    ]) { resp ->
+      def ok = (resp.status == 200 && resp.data?.status == 'ok')
+      state.bridgeHealth = [
+        status: ok ? 'ok' : 'error',
+        uptime: resp.data?.uptime,
+        sessions: resp.data?.sessions,
+        version: resp.data?.version,
+        last: now(),
+        error: ok ? null : "status=${resp.status}"
+      ]
+      if (ok) {
+        log.debug "[NodeBridge] Health OK uptime=${resp.data?.uptime}s sessions=${resp.data?.sessions}"
+      } else {
+        log.warn "[NodeBridge] Health check returned non-OK status=${resp.status}"
+      }
+    }
+  } catch (Exception e) {
+    state.bridgeHealth = [status: 'error', last: now(), error: e.message]
+    if (force) {
+      log.error "[NodeBridge] Health check failed: ${e.message}"
+    } else {
+      log.warn "[NodeBridge] Health check failed: ${e.message}"
+    }
+  }
+}
+
 def pollAll() {
   if (!state.nodeSessionId) {
     log.warn "Cannot poll devices - no Node bridge session"
@@ -514,62 +560,14 @@ def sendHsCommand(String devId, String cmd, Map args=[:]) {
   }
 }
 
-private generateApiUrl(String endpoint) {
-  endpoint = endpoint.startsWith("/") ? endpoint.substring(1) : endpoint
-  return "https://api2.afero.net/${endpoint}"
-}
+// Deprecated: direct cloud API disabled; bridge handles API URL generation
+private generateApiUrl(String endpoint) { return "" }
 
-private getAccountId() {
-  if (!state.accountId) {
-    if (!checkAndRenewToken()) return
-    
-    try {
-      def url = generateApiUrl("/v1/users/me")
-      httpGet([
-        uri: url, 
-        headers: [
-          "Authorization": "Bearer ${state.accessToken}",
-          "Host": "api2.afero.net"
-        ], 
-        timeout: 10
-      ]) { resp ->
-        if (resp.status != 200) {
-          throw new Exception("Failed to get account ID: ${resp.status}")
-        }
-        def jsonData = resp.data
-        if (!jsonData?.accountAccess || jsonData.accountAccess.size() == 0) {
-          throw new Exception("No account ID found")
-        }
-        state.accountId = jsonData.accountAccess[0].account.accountId
-        log.debug "Retrieved account ID: ${state.accountId}"
-      }
-    } catch (Exception e) {
-      log.error "Error retrieving account ID: ${e.message}"
-      throw e
-    }
-  }
-}
+// Deprecated: direct cloud API disabled; accountId comes from Node bridge login
+private getAccountId() { }
 
-private checkAndRenewToken() {
-  if (!state.accessToken) {
-    log.warn "No access token available. Please authenticate with your HubSpace credentials."
-    return false
-  }
-  
-  // Check if token is expired and try to refresh
-  if (state.tokenExpires && now() >= state.tokenExpires) {
-    log.info "Access token expired, attempting to refresh"
-    if (refreshAccessToken()) {
-      log.info "Token refreshed successfully"
-      return true
-    } else {
-      log.warn "Token refresh failed. Please re-authenticate."
-      return false
-    }
-  }
-  
-  return true
-}
+// Deprecated: direct cloud API disabled; bridge manages auth
+private checkAndRenewToken() { false }
 
 void refreshIndexAndDiscover() {
   // Ensure known set exists
