@@ -9,6 +9,20 @@ metadata {
     
     attribute "duration", "number"
     attribute "remainingTime", "number"
+
+    // Network/health telemetry surfaced by the app
+    attribute "ssid", "string"
+    attribute "rssi", "number"
+    attribute "wifiState", "string"
+    attribute "wifiSetupState", "string"
+    attribute "wifiMac", "string"
+    attribute "visible", "string"
+    attribute "direct", "string"
+    attribute "healthStatus", "string"
+    attribute "latitude", "number"
+    attribute "longitude", "number"
+    attribute "location", "string"
+    attribute "schedulerFlags", "string"
     
     command "setDuration", [[name:"duration", type:"NUMBER", description:"Timer duration in minutes"]]
     command "startWithDuration", [[name:"duration", type:"NUMBER", description:"Start watering with duration in minutes"]]

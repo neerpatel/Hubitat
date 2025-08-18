@@ -8,6 +8,20 @@ metadata {
     
     attribute "securitySystemStatus", "enum", ["disarmed", "armed home", "armed away", "armed night"]
     attribute "alarmStatus", "enum", ["off", "strobe", "siren", "both"]
+
+    // Network/health telemetry surfaced by the app
+    attribute "ssid", "string"
+    attribute "rssi", "number"
+    attribute "wifiState", "string"
+    attribute "wifiSetupState", "string"
+    attribute "wifiMac", "string"
+    attribute "visible", "string"
+    attribute "direct", "string"
+    attribute "healthStatus", "string"
+    attribute "latitude", "number"
+    attribute "longitude", "number"
+    attribute "location", "string"
+    attribute "schedulerFlags", "string"
     
     command "armHome"
     command "armAway"

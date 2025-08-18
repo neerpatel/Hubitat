@@ -11,6 +11,20 @@ metadata {
     attribute "triggerMode", "enum", ["off", "home", "away", "home/away"]
     attribute "chirpMode", "enum", ["off", "on"]
     attribute "bypassMode", "enum", ["off", "on"]
+
+    // Network/health telemetry surfaced by the app
+    attribute "ssid", "string"
+    attribute "rssi", "number"
+    attribute "wifiState", "string"
+    attribute "wifiSetupState", "string"
+    attribute "wifiMac", "string"
+    attribute "visible", "string"
+    attribute "direct", "string"
+    attribute "healthStatus", "string"
+    attribute "latitude", "number"
+    attribute "longitude", "number"
+    attribute "location", "string"
+    attribute "schedulerFlags", "string"
     
     command "setTriggerMode", [[name:"mode", type:"ENUM", constraints:["off", "home", "away", "home/away"]]]
     command "setChirpMode", [[name:"mode", type:"ENUM", constraints:["off", "on"]]]

@@ -10,6 +10,20 @@ metadata {
         attribute 'motionAction', 'string'
         attribute 'sensitivity', 'string'
 
+        // Network/health telemetry surfaced by the app
+        attribute 'ssid', 'string'
+        attribute 'rssi', 'number'
+        attribute 'wifiState', 'string'
+        attribute 'wifiSetupState', 'string'
+        attribute 'wifiMac', 'string'
+        attribute 'visible', 'string'
+        attribute 'direct', 'string'
+        attribute 'healthStatus', 'string'
+        attribute 'latitude', 'number'
+        attribute 'longitude', 'number'
+        attribute 'location', 'string'
+        attribute 'schedulerFlags', 'string'
+
         command 'setAutoOffTimer', [[name: 'seconds', type: 'NUMBER']]
         command 'setMotionAction', [[name: 'action', type: 'ENUM', constraints: ['off','on','timer']]]
         command 'setHumiditySensitivity', [[name: 'level', type: 'ENUM', constraints: ['low','medium','high']]]

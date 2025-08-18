@@ -1,3 +1,5 @@
 
 node_modules/
 **/KasaDevices/
+Hubitat/Hubspace/app/Hubspace
+.DS_Store

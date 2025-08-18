@@ -8,6 +8,20 @@ metadata {
     capability "Actuator"
     capability "Refresh"
     capability "PresenceSensor"
+
+    // Network/health telemetry surfaced by the app
+    attribute "ssid", "string"
+    attribute "rssi", "number"
+    attribute "wifiState", "string"
+    attribute "wifiSetupState", "string"
+    attribute "wifiMac", "string"
+    attribute "visible", "string"
+    attribute "direct", "string"
+    attribute "healthStatus", "string"
+    attribute "latitude", "number"
+    attribute "longitude", "number"
+    attribute "location", "string"
+    attribute "schedulerFlags", "string"
   }
   preferences {
     input name: "transitionMs", type: "number", title: "Fade (ms)", defaultValue: 300
