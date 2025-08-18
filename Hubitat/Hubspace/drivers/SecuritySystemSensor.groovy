@@ -1,5 +1,22 @@
+/*
+ * ====================================================================
+ *  HubSpace Security System Sensor (Driver)
+ *
+ *  Capabilities: ContactSensor, MotionSensor, Battery, PresenceSensor
+ *  Purpose:
+ *  - Map sensor configuration to HubSpace 'sensor-config' function via instance (e.g., sensor-1).
+ *  - Supports triggerMode, chirpMode, and bypassMode as attributes/commands.
+ *  - Versioned logging via driverVer() for diagnostics.
+ *
+ *  Notes:
+ *  - Telemetry attributes (wifi, rssi, etc.) are populated by the parent app.
+ * ====================================================================
+ */
+
+String driverVer() { return "0.1.0" }
+
 metadata {
-  definition(name: "HubSpace Security System Sensor", namespace: "neerpatel/hubspace", author: "Neer Patel") {
+  definition(name: "HubSpace Security System Sensor", namespace: "neerpatel/hubspace", author: "Neer Patel", version: "0.1.0") {
     capability "Initialize"
     capability "ContactSensor"
     capability "MotionSensor"
@@ -31,17 +48,12 @@ metadata {
     command "setBypassMode", [[name:"mode", type:"ENUM", constraints:["off", "on"]]]
   }
 }
+def initialize() { log.debug "Initializing HubSpace Security System Sensor v${driverVer()}" }
 
-def initialize() {
-  log.debug "Initializing HubSpace Security System Sensor"
-}
-
-def refresh() { 
-  parent.pollChild(device) 
-}
+def refresh() { parent.pollChild(device) }
 
 def setTriggerMode(mode) {
-  log.info "Setting trigger mode to ${mode} for ${device.displayName}"
+  log.info "Setting trigger mode to ${mode} for ${device.displayName} (drv v${driverVer()})"
   def triggerValue = mode == "home/away" ? 3 : (mode == "away" ? 2 : (mode == "home" ? 1 : 0))
   parent.sendHsCommand(id(), "sensor-config", [
     instance: device.getDataValue("sensorInstance") ?: "sensor-1",
@@ -54,7 +66,7 @@ def setTriggerMode(mode) {
 }
 
 def setChirpMode(mode) {
-  log.info "Setting chirp mode to ${mode} for ${device.displayName}"
+  log.info "Setting chirp mode to ${mode} for ${device.displayName} (drv v${driverVer()})"
   def chirpValue = mode == "on" ? 1 : 0
   parent.sendHsCommand(id(), "sensor-config", [
     instance: device.getDataValue("sensorInstance") ?: "sensor-1",
@@ -67,7 +79,7 @@ def setChirpMode(mode) {
 }
 
 def setBypassMode(mode) {
-  log.info "Setting bypass mode to ${mode} for ${device.displayName}"
+  log.info "Setting bypass mode to ${mode} for ${device.displayName} (drv v${driverVer()})"
   def bypassValue = mode == "on" ? 1 : 0
   parent.sendHsCommand(id(), "sensor-config", [
     instance: device.getDataValue("sensorInstance") ?: "sensor-1",

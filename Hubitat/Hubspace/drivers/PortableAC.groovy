@@ -1,5 +1,22 @@
+/*
+ * ====================================================================
+ *  HubSpace Portable AC (Driver)
+ *
+ *  Capabilities: Thermostat, ThermostatMode, ThermostatFanMode, TemperatureMeasurement
+ *  Purpose:
+ *  - Map Hubitat AC controls to HubSpace: 'temperature' (cooling-target), 'mode',
+ *    'fan-speed' (instance: ac-fan-speed), and 'sleep'.
+ *  - Versioned logging via driverVer() for diagnostics.
+ *
+ *  Notes:
+ *  - Telemetry attributes (wifi, rssi, etc.) are populated by the parent app.
+ * ====================================================================
+ */
+
+String driverVer() { return "0.1.0" }
+
 metadata {
-    definition(name: 'HubSpace Portable AC', namespace: 'neerpatel/hubspace', author: 'Neer Patel') {
+    definition(name: 'HubSpace Portable AC', namespace: 'neerpatel/hubspace', author: 'Neer Patel', version: '0.1.0') {
         capability 'Initialize'
         capability 'Refresh'
         capability 'Thermostat'
@@ -24,23 +41,26 @@ metadata {
         attribute "schedulerFlags", "string"
     }
 }
-
-def initialize() { }
+def initialize() { log.debug "Initializing HubSpace Portable AC v${driverVer()}" }
 def refresh() { parent.pollChild(device) }
 
 def setCoolingSetpoint(temperature) {
+    log.info "Set cooling setpoint ${temperature} (drv v${driverVer()}) for ${device.displayName}"
     parent.sendHsCommand(id(), "temperature", [instance: "cooling-target", value: temperature as float])
 }
 
 def setThermostatMode(mode) {
+    log.info "Set thermostat mode ${mode} (drv v${driverVer()}) for ${device.displayName}"
     parent.sendHsCommand(id(), "mode", [value: mode])
 }
 
 def setFanMode(fanMode) {
+    log.info "Set fan speed ${fanMode} (drv v${driverVer()}) for ${device.displayName}"
     parent.sendHsCommand(id(), "fan-speed", [instance: "ac-fan-speed", value: fanMode])
 }
 
 def setSleepMode(mode) {
+    log.info "Set sleep mode ${mode} (drv v${driverVer()}) for ${device.displayName}"
     parent.sendHsCommand(id(), "sleep", [value: mode])
 }
 

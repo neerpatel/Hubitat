@@ -1,5 +1,23 @@
+/*
+ * ====================================================================
+ *  HubSpace Light (Driver)
+ *
+ *  Capabilities: Switch, Switch Level, ColorTemperature, Color Control
+ *  Purpose:
+ *  - Map Hubitat lighting commands to HubSpace function classes via parent app.
+ *  - Functions used: power, brightness, color-temperature, color-rgb.
+ *  - Versioned logging via driverVer() for diagnostics.
+ *
+ *  Notes:
+ *  - Color input is Hubitat HSV; converted to RGB for HubSpace.
+ *  - Telemetry attributes (wifi, rssi, etc.) are populated by the parent app.
+ * ====================================================================
+ */
+
+String driverVer() { return "0.1.0" }
+
 metadata {
-  definition(name: "HubSpace Light", namespace: "neerpatel/hubspace", author: "Neer Patel") {
+  definition(name: "HubSpace Light", namespace: "neerpatel/hubspace", author: "Neer Patel", version: "0.1.0") {
     capability "Initialize"
     capability "Switch"
     capability "Switch Level"
@@ -28,36 +46,32 @@ metadata {
   }
 }
 
-def initialize() {
-  log.debug "Initializing HubSpace Light"
-}
+def initialize() { log.debug "Initializing HubSpace Light v${driverVer()}" }
 
-def refresh() { 
-  parent.pollChild(device) 
-}
+def refresh() { parent.pollChild(device) }
 
 def on() { 
-  log.info "Turning on ${device.displayName}"
+  log.info "Turning on ${device.displayName} (drv v${driverVer()})"
   parent.sendHsCommand(id(), "power", [value: "on"]) 
 }
 
 def off() { 
-  log.info "Turning off ${device.displayName}"
+  log.info "Turning off ${device.displayName} (drv v${driverVer()})"
   parent.sendHsCommand(id(), "power", [value: "off"]) 
 }
 
 def setLevel(v, dur=null) {
-  log.info "Setting level to ${v} for ${device.displayName}"
+  log.info "Setting level to ${v} for ${device.displayName} (drv v${driverVer()})"
   parent.sendHsCommand(id(), "brightness", [value: v as int])
 }
 
 def setColorTemperature(kelvin) {
-  log.info "Setting color temperature to ${kelvin}K for ${device.displayName}"
+  log.info "Setting color temperature to ${kelvin}K for ${device.displayName} (drv v${driverVer()})"
   parent.sendHsCommand(id(), "color-temperature", [value: kelvin as int])
 }
 
 def setColor(value) {
-  log.info "Setting color for ${device.displayName}: ${value}"
+  log.info "Setting color for ${device.displayName} (drv v${driverVer()}): ${value}"
   // value is a map like [hue:0-99, saturation:0-99, level:0-100]
   def rgb = hubitatColorToRgb(value)
   parent.sendHsCommand(id(), "color-rgb", [value: [r: rgb.r, g: rgb.g, b: rgb.b]])

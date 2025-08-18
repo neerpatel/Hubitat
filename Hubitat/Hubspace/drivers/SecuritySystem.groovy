@@ -1,5 +1,22 @@
+/*
+ * ====================================================================
+ *  HubSpace Security System (Driver)
+ *
+ *  Capabilities: SecurityKeypad, Alarm, PresenceSensor
+ *  Purpose:
+ *  - Map arming modes to HubSpace 'security-system-mode' values (home, away, night, disarmed).
+ *  - Map Alarm capability to HubSpace 'alarm-status' (off, strobe, siren, both).
+ *  - Versioned logging via driverVer() for diagnostics.
+ *
+ *  Notes:
+ *  - Telemetry attributes (wifi, rssi, etc.) are populated by the parent app.
+ * ====================================================================
+ */
+
+String driverVer() { return "0.1.0" }
+
 metadata {
-  definition(name: "HubSpace Security System", namespace: "neerpatel/hubspace", author: "Neer Patel") {
+  definition(name: "HubSpace Security System", namespace: "neerpatel/hubspace", author: "Neer Patel", version: "0.1.0") {
     capability "Initialize"
     capability "SecurityKeypad"
     capability "Refresh"
@@ -35,37 +52,32 @@ metadata {
     command "off"
   }
 }
+def initialize() { log.debug "Initializing HubSpace Security System v${driverVer()}" }
 
-def initialize() {
-  log.debug "Initializing HubSpace Security System"
-}
-
-def refresh() { 
-  parent.pollChild(device) 
-}
+def refresh() { parent.pollChild(device) }
 
 def armHome() {
-  log.info "Arming home for ${device.displayName}"
+  log.info "Arming home for ${device.displayName} (drv v${driverVer()})"
   parent.sendHsCommand(id(), "security-system-mode", [value: "home"])
 }
 
 def armAway() {
-  log.info "Arming away for ${device.displayName}"
+  log.info "Arming away for ${device.displayName} (drv v${driverVer()})"
   parent.sendHsCommand(id(), "security-system-mode", [value: "away"])
 }
 
 def armNight() {
-  log.info "Arming night for ${device.displayName}"
+  log.info "Arming night for ${device.displayName} (drv v${driverVer()})"
   parent.sendHsCommand(id(), "security-system-mode", [value: "night"])
 }
 
 def disarm() {
-  log.info "Disarming ${device.displayName}"
+  log.info "Disarming ${device.displayName} (drv v${driverVer()})"
   parent.sendHsCommand(id(), "security-system-mode", [value: "disarmed"])
 }
 
 def setAlarmStatus(status) {
-  log.info "Setting alarm status to ${status} for ${device.displayName}"
+  log.info "Setting alarm status to ${status} for ${device.displayName} (drv v${driverVer()})"
   parent.sendHsCommand(id(), "alarm-status", [value: status])
 }
 

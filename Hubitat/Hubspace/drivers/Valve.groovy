@@ -1,5 +1,22 @@
+/*
+ * ====================================================================
+ *  HubSpace Valve / Water Timer (Driver)
+ *
+ *  Capabilities: Valve, Switch, Battery, PresenceSensor
+ *  Purpose:
+ *  - Map open/close to HubSpace 'power' on/off.
+ *  - Support timer-duration for watering time.
+ *  - Versioned logging via driverVer() for diagnostics.
+ *
+ *  Notes:
+ *  - Telemetry attributes (wifi, rssi, etc.) are populated by the parent app.
+ * ====================================================================
+ */
+
+String driverVer() { return "0.1.0" }
+
 metadata {
-  definition(name: "HubSpace Valve", namespace: "neerpatel/hubspace", author: "Neer Patel") {
+  definition(name: "HubSpace Valve", namespace: "neerpatel/hubspace", author: "Neer Patel", version: "0.1.0") {
     capability "Initialize"
     capability "Valve"
     capability "Switch"
@@ -28,22 +45,17 @@ metadata {
     command "startWithDuration", [[name:"duration", type:"NUMBER", description:"Start watering with duration in minutes"]]
   }
 }
+def initialize() { log.debug "Initializing HubSpace Valve v${driverVer()}" }
 
-def initialize() {
-  log.debug "Initializing HubSpace Valve"
-}
-
-def refresh() { 
-  parent.pollChild(device) 
-}
+def refresh() { parent.pollChild(device) }
 
 def open() { 
-  log.info "Opening valve ${device.displayName}"
+  log.info "Opening valve ${device.displayName} (drv v${driverVer()})"
   parent.sendHsCommand(id(), "power", [value: "on"]) 
 }
 
 def close() { 
-  log.info "Closing valve ${device.displayName}"
+  log.info "Closing valve ${device.displayName} (drv v${driverVer()})"
   parent.sendHsCommand(id(), "power", [value: "off"]) 
 }
 
@@ -51,7 +63,7 @@ def on() { open() }
 def off() { close() }
 
 def setDuration(duration) {
-  log.info "Setting duration to ${duration} minutes for ${device.displayName}"
+  log.info "Setting duration to ${duration} minutes for ${device.displayName} (drv v${driverVer()})"
   parent.sendHsCommand(id(), "timer-duration", [value: duration as int])
 }
 

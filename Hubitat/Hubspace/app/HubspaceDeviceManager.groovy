@@ -1,15 +1,37 @@
 /*
- *  Hubspace Device Manager
- *  Provides connection to Hubspace cloud API and controls Hubspace devices.
- *  This driver is inspired by https://github.com/jdeath/Hubspace-Homeassistant
- *  and structured similar to drivers in https://github.com/DaveGut/HubitatActive.
+ * ====================================================================
+ *  HubSpace Device Manager (App)
+ *
+ *  Purpose:
+ *  - Connects Hubitat to HubSpace via the local Node bridge (bridge-node).
+ *  - Manages login/session, discovery of devices, child creation, polling,
+ *    and routing commands from children to HubSpace function classes.
+ *
+ *  Key Features:
+ *  - Preferences for bridge URL and HubSpace credentials (username/password).
+ *  - Connects to bridge: POST /login; stores session/accountId.
+ *  - Discovery: GET /devices; normalizes list; add selected as child devices.
+ *  - Polling: GET /state/{id}; translates function states to Hubitat events.
+ *  - Commands: PUT /command/{id}; maps Hubitat actions to HubSpace functions via sendHsCommand.
+ *  - Health: /health periodic checks with status in app page.
+ *  - Versioned logging: appVersion() is included in key log points.
+ *
+ *  Notes:
+ *  - No credentials are logged. Session ID is shown for diagnostics only.
+ *  - Function class mapping/event translation lives in updateFromState/processStateValue.
+ *  - Drivers call parent.sendHsCommand to hit the bridge.
+ * ====================================================================
  */
+
+// Version helper (Kasa-style): include in logs and diagnostics
+String appVersion() { return "0.1.0" }
 
 
 definition(
   name: "HubSpace Device Manager",
   namespace: "neerpatel/hubspace",
   author: "Neer Patel",
+  version: appVersion(),
   importUrl: "https://raw.githubusercontent.com/neerpatel/hubspace/main/Hubitat/app/Hubspace/HubspaceDeviceManager.groovy", 
   description: "Discover and control HubSpace devices via cloud API",
   iconUrl: "",
@@ -95,9 +117,9 @@ def installed() { initialize() }
 def updated()  { unschedule(); initialize() }
 
 def initialize() {
-  log.debug "Initializing HubspaceDeviceManager"
+  log.debug "Initializing HubspaceDeviceManager v${appVersion()}"
   if (!state.nodeSessionId || !settings.nodeBridgeUrl) {
-    log.info "Bridge not connected. Please configure URL and connect."
+    log.info "Bridge not connected (app v${appVersion()}). Configure URL and connect."
     return
   }
   
@@ -129,13 +151,13 @@ private connectToNodeBridge() {
   }
   
   if (!settings.username || !settings.password) {
-    log.warn "HubSpace credentials required for bridge authentication"
+    log.warn "HubSpace credentials required for bridge authentication (app v${appVersion()})"
     return
   }
   
   try {
     def loginData = [username: settings.username, password: settings.password]
-    log.info "[NodeBridge] POST /login ${settings.nodeBridgeUrl}"
+    log.info "[NodeBridge] POST /login ${settings.nodeBridgeUrl} (app v${appVersion()})"
     httpPost([
       uri: "${settings.nodeBridgeUrl}/login",
       headers: ["Content-Type": "application/json"],
@@ -147,13 +169,13 @@ private connectToNodeBridge() {
         def responseData = resp.data
         state.nodeSessionId = responseData.sessionId
         state.nodeBridgeAccountId = responseData.accountId
-        log.info "[NodeBridge] Connected. session=${state.nodeSessionId} accountId=${state.nodeBridgeAccountId}"
+        log.info "[NodeBridge] Connected (app v${appVersion()}). session=${state.nodeSessionId} accountId=${state.nodeBridgeAccountId}"
       } else {
-        throw new Exception("[NodeBridge] Login failed with status: ${resp.status}")
+        throw new Exception("[NodeBridge] Login failed (app v${appVersion()}) with status: ${resp.status}")
       }
     }
   } catch (Exception e) {
-    log.error "[NodeBridge] Failed to connect: ${e.message}"
+    log.error "[NodeBridge] Failed to connect (app v${appVersion()}): ${e.message}"
     state.nodeSessionId = null
   }
 }
@@ -172,13 +194,13 @@ private testNodeBridgeConnection() {
     ]) { resp ->
       if (resp.status == 200) {
         def deviceCount = resp.data?.size() ?: 0
-        log.info "Bridge connection successful! Found ${deviceCount} devices."
+        log.info "Bridge connection successful (app v${appVersion()})! Found ${deviceCount} devices."
       } else {
-        throw new Exception("Bridge test failed with status: ${resp.status}")
+        throw new Exception("Bridge test failed (app v${appVersion()}) with status: ${resp.status}")
       }
     }
   } catch (Exception e) {
-    log.error "Bridge connection test failed: ${e.message}"
+    log.error "Bridge connection test failed (app v${appVersion()}): ${e.message}"
     state.nodeSessionId = null
   }
 }
@@ -201,17 +223,17 @@ def healthCheck(force=false) {
         error: ok ? null : "status=${resp.status}"
       ]
       if (ok) {
-        log.debug "[NodeBridge] Health OK uptime=${resp.data?.uptime}s sessions=${resp.data?.sessions}"
+        log.debug "[NodeBridge] Health OK (app v${appVersion()}) uptime=${resp.data?.uptime}s sessions=${resp.data?.sessions}"
       } else {
-        log.warn "[NodeBridge] Health check returned non-OK status=${resp.status}"
+        log.warn "[NodeBridge] Health check returned non-OK (app v${appVersion()}) status=${resp.status}"
       }
     }
   } catch (Exception e) {
     state.bridgeHealth = [status: 'error', last: now(), error: e.message]
     if (force) {
-      log.error "[NodeBridge] Health check failed: ${e.message}"
+      log.error "[NodeBridge] Health check failed (app v${appVersion()}): ${e.message}"
     } else {
-      log.warn "[NodeBridge] Health check failed: ${e.message}"
+      log.warn "[NodeBridge] Health check failed (app v${appVersion()}): ${e.message}"
     }
   }
 }
@@ -235,7 +257,7 @@ def pollChild(cd) {
       updateFromState(cd, resp.data)
     }
   } catch (Exception e) {
-    log.warn "Node bridge error polling device ${cd.displayName}: ${e.message}"
+    log.warn "Node bridge error polling device ${cd.displayName} (app v${appVersion()}): ${e.message}"
   }
 }
 
@@ -271,9 +293,9 @@ def sendHsCommand(String devId, String cmd, Map args=[:]) {
       timeout: 10
     ]) { resp ->
       if (resp.status != 200) {
-        log.warn "Node bridge command failed: $cmd $args -> ${resp.data}"
+        log.warn "Node bridge command failed (app v${appVersion()}): $cmd $args -> ${resp.data}"
       } else {
-        log.debug "Node bridge command successful: $cmd $args"
+        log.debug "Node bridge command successful (app v${appVersion()}): $cmd $args"
         def childDevice = getChildDevices().find { it.deviceNetworkId == "hubspace-${devId}" }
         if (childDevice) {
           runIn(2, "pollChild", [data: childDevice])
@@ -281,7 +303,7 @@ def sendHsCommand(String devId, String cmd, Map args=[:]) {
       }
     }
   } catch (Exception e) {
-    log.error "Node bridge error sending command $cmd to device $devId: ${e.message}"
+    log.error "Node bridge error sending command $cmd to device $devId (app v${appVersion()}): ${e.message}"
   }
 }
 

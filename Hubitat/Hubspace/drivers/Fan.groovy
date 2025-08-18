@@ -1,5 +1,22 @@
+/*
+ * ====================================================================
+ *  HubSpace Fan (Driver)
+ *
+ *  Capabilities: Switch, FanControl
+ *  Purpose:
+ *  - Map Hubitat fan actions to HubSpace: 'power', 'fan-speed', 'fan-direction'.
+ *  - Converts Hubitat speed names to numeric values expected by HubSpace.
+ *  - Versioned logging via driverVer() for diagnostics.
+ *
+ *  Notes:
+ *  - Telemetry attributes (wifi, rssi, etc.) are populated by the parent app.
+ * ====================================================================
+ */
+
+String driverVer() { return "0.1.0" }
+
 metadata {
-  definition(name: "HubSpace Fan", namespace: "neerpatel/hubspace", author: "Neer Patel") {
+  definition(name: "HubSpace Fan", namespace: "neerpatel/hubspace", author: "Neer Patel", version: "0.1.0") {
     capability "Initialize"
     capability "Switch"
     capability "FanControl"
@@ -26,27 +43,24 @@ metadata {
     attribute "schedulerFlags", "string"
   }
 }
-
-def initialize() {
-  log.debug "Initializing HubSpace Fan"
-}
+def initialize() { log.debug "Initializing HubSpace Fan v${driverVer()}" }
 
 def refresh() { 
   parent.pollChild(device) 
 }
 
 def on() { 
-  log.info "Turning on ${device.displayName}"
+  log.info "Turning on ${device.displayName} (drv v${driverVer()})"
   parent.sendHsCommand(id(), "power", [value: "on"]) 
 }
 
 def off() { 
-  log.info "Turning off ${device.displayName}"
+  log.info "Turning off ${device.displayName} (drv v${driverVer()})"
   parent.sendHsCommand(id(), "power", [value: "off"]) 
 }
 
 def setSpeed(speed) {
-  log.info "Setting fan speed to ${speed} for ${device.displayName}"
+  log.info "Setting fan speed to ${speed} for ${device.displayName} (drv v${driverVer()})"
   
   // Convert Hubitat speed names to numeric values for HubSpace API
   def speedValue
@@ -101,7 +115,7 @@ def cycleSpeed() {
 }
 
 def setDirection(direction) {
-  log.info "Setting fan direction to ${direction} for ${device.displayName}"
+  log.info "Setting fan direction to ${direction} for ${device.displayName} (drv v${driverVer()})"
   parent.sendHsCommand(id(), "fan-direction", [value: direction])
 }
 
