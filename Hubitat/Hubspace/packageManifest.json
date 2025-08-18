@@ -2,5 +2,32 @@
   "packageName": "HubSpace-Device",
   "author": "Neer Patel",
   "minimumHEVersion": "0.0",
-  "dateReleased": "2025-08-18"
+  "dateReleased": "2025-08-18",
+  "apps": [
+    {
+      "id": "cc440ddd-451c-4f0b-a886-b900194c0ae3",
+      "name": "HubSpace Device Manager",
+      "namespace": "neerpatel/hubspace",
+      "location": "https://raw.githubusercontent.com/neerpatel/Hubitat/refs/heads/HubSpace/Hubitat/Hubspace/app/HubspaceDeviceManager.groovy",
+      "required": false,
+      "oauth": false,
+      "primary": false
+    }
+  ],
+  "drivers": [
+    {
+      "id": "48025f9e-1fff-4126-aafa-3a59251a1c3b",
+      "name": "HubSpace Light",
+      "namespace": "neerpatel/hubspace",
+      "location": "https://raw.githubusercontent.com/neerpatel/Hubitat/refs/heads/HubSpace/Hubitat/Hubspace/drivers/Light.groovy",
+      "required": false
+    },
+    {
+      "id": "433fd73c-73f4-4ebf-b2a2-0f329e7d99b2",
+      "name": "HubSpace Fan",
+      "namespace": "neerpatel/hubspace",
+      "location": "https://raw.githubusercontent.com/neerpatel/Hubitat/refs/heads/HubSpace/Hubitat/Hubspace/drivers/Fan.groovy",
+      "required": false
+    }
+  ]
 }
