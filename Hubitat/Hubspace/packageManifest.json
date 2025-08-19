@@ -9,17 +9,17 @@
       "name": "HubSpace Device Manager",
       "namespace": "neerpatel/hubspace",
       "location": "https://raw.githubusercontent.com/neerpatel/Hubitat/refs/heads/HubSpace/Hubitat/Hubspace/app/HubspaceDeviceManager.groovy",
-      "required": false,
+      "required": true,
       "oauth": false,
-      "primary": false,
+      "primary": true,
       "version": "0.1.0"
     }
   ],
   "drivers": [
     {
       "id": "90cadb56-a0b4-443c-9a4a-59492913fcd0",
-      "name": "",
-      "namespace": "",
+      "name": "HubSpace Exhaust Fan",
+      "namespace": "neerpatel/hubspace",
       "location": "https://raw.githubusercontent.com/neerpatel/Hubitat/refs/heads/HubSpace/Hubitat/Hubspace/drivers/ExhaustFan.groovy",
       "required": false,
       "version": "0.1.0"
@@ -50,8 +50,8 @@
     },
     {
       "id": "7b8f0c24-6966-49f2-a545-e32f2c359d2f",
-      "name": "",
-      "namespace": "",
+      "name": "HubSpace Portable AC",
+      "namespace": "neerpatel/hubspace",
       "location": "https://raw.githubusercontent.com/neerpatel/Hubitat/refs/heads/HubSpace/Hubitat/Hubspace/drivers/PortableAC.groovy",
       "required": false,
       "version": "0.1.0"
@@ -82,8 +82,8 @@
     },
     {
       "id": "6d248770-356c-452f-8402-5882d82d09fd",
-      "name": "",
-      "namespace": "",
+      "name": "HubSpace Thermostat",
+      "namespace": "neerpatel/hubspace",
       "location": "https://raw.githubusercontent.com/neerpatel/Hubitat/refs/heads/HubSpace/Hubitat/Hubspace/drivers/Thermostat.groovy",
       "required": false,
       "version": "0.1.0"
