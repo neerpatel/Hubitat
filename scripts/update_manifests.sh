@@ -50,6 +50,21 @@ get_version() {
     echo "$v"
 }
 
+# Extract a quoted field value from definition(...) e.g., name / namespace.
+# Falls back to a provided default if not present.
+get_def_field() {
+    local file="$1"; shift
+    local key="$1"; shift
+    local default_val="${1:-}"
+    local val
+    val=$(grep -Eo "${key}:[[:space:]]*'[^']+'|${key}:[[:space:]]*\"[^\"]+\"" "$file" | head -n1 | sed -E "s/${key}:[[:space:]]*['\"]([^'\"]+)['\"]/\1/") || true
+    if [ -z "$val" ]; then
+        echo "$default_val"
+    else
+        echo "$val"
+    fi
+}
+
 echo "Cleaning up removed drivers from manifest (by filename)..."
 while IFS= read -r loc; do
         base=$(basename "$loc")
@@ -76,6 +91,8 @@ for driver in "${APP_FOLDER}"drivers/*.groovy; do
         fname=$(basename "$driver")
         url="$GITHUBREPO/drivers/$fname"
         ver=$(get_version "$driver")
+        name=$(get_def_field "$driver" name "$fname")
+        ns=$(get_def_field "$driver" namespace "neerpatel/hubspace")
         curLoc=$(jq -r --arg fn "$fname" 'first(.drivers[]? | select((.location|split("/")|last)==$fn) | .location) // empty' "$PackageManifest")
         if [ -n "$curLoc" ]; then
                 if [ "$curLoc" != "$url" ]; then
@@ -91,39 +108,43 @@ for driver in "${APP_FOLDER}"drivers/*.groovy; do
                                 [ -n "$curName" ] && "$HPM" manifest-remove-driver --name="$curName" "$PackageManifest" || true
                         fi
                         if [ -n "$ver" ]; then
-                                "$HPM" manifest-add-driver --location="$url" --version="$ver" "$PackageManifest" || {
+                                "$HPM" manifest-add-driver --location="$url" --version="$ver" --name="$name" --namespace="$ns" "$PackageManifest" || {
                                     echo "ERROR: Failed to add driver $fname to manifest." >&2
                                     exit 2
                                 }
                         else
-                                "$HPM" manifest-add-driver --location="$url" "$PackageManifest" || {
+                                "$HPM" manifest-add-driver --location="$url" --name="$name" --namespace="$ns" "$PackageManifest" || {
                                     echo "ERROR: Failed to add driver $fname to manifest." >&2
                                     exit 2
                                 }
                         fi
                 else
                         echo "Modifying driver: $fname version=${ver:-"(none)"}"
-                        if [ -n "$ver" ]; then
-                                "$HPM" manifest-modify-driver --location="$url" --version="$ver" "$PackageManifest" || {
-                                    echo "ERROR: Failed to modify driver $fname in manifest." >&2
-                                    exit 2
-                                }
+                        curId=$(jq -r --arg fn "$fname" 'first(.drivers[]? | select((.location|split("/")|last)==$fn) | .id) // empty' "$PackageManifest")
+                        if [ -n "$curId" ]; then
+                            if [ -n "$ver" ]; then
+                                "$HPM" manifest-modify-driver --id="$curId" --location="$url" --name="$name" --namespace="$ns" --version="$ver" "$PackageManifest" || { echo "ERROR: Failed to modify driver $fname" >&2; exit 2; }
+                            else
+                                "$HPM" manifest-modify-driver --id="$curId" --location="$url" --name="$name" --namespace="$ns" "$PackageManifest" || { echo "ERROR: Failed to modify driver $fname" >&2; exit 2; }
+                            fi
                         else
-                                "$HPM" manifest-modify-driver --location="$url" "$PackageManifest" || {
-                                    echo "ERROR: Failed to modify driver $fname in manifest." >&2
-                                    exit 2
-                                }
+                            # Fallback by name
+                            if [ -n "$ver" ]; then
+                                "$HPM" manifest-modify-driver --name="$name" --location="$url" --namespace="$ns" --version="$ver" "$PackageManifest" || true
+                            else
+                                "$HPM" manifest-modify-driver --name="$name" --location="$url" --namespace="$ns" "$PackageManifest" || true
+                            fi
                         fi
                 fi
         else
                 echo "Adding driver: $fname version=${ver:-"(none)"}"
                 if [ -n "$ver" ]; then
-                        "$HPM" manifest-add-driver --location="$url" --version="$ver" "$PackageManifest" || {
+                        "$HPM" manifest-add-driver --location="$url" --version="$ver" --name="$name" --namespace="$ns" "$PackageManifest" || {
                             echo "ERROR: Failed to add driver $fname to manifest." >&2
                             exit 2
                         }
                 else
-                        "$HPM" manifest-add-driver --location="$url" "$PackageManifest" || {
+                        "$HPM" manifest-add-driver --location="$url" --name="$name" --namespace="$ns" "$PackageManifest" || {
                             echo "ERROR: Failed to add driver $fname to manifest." >&2
                             exit 2
                         }
@@ -155,6 +176,8 @@ for app in "${APP_FOLDER}"app/*.groovy; do
         fname=$(basename "$app")
         url="$GITHUBREPO/app/$fname"
         ver=$(get_version "$app")
+        name=$(get_def_field "$app" name "$fname")
+        ns=$(get_def_field "$app" namespace "neerpatel/hubspace")
         curLoc=$(jq -r --arg fn "$fname" 'first(.apps[]? | select((.location|split("/")|last)==$fn) | .location) // empty' "$PackageManifest")
         if [ -n "$curLoc" ]; then
                 if [ "$curLoc" != "$url" ]; then
@@ -170,39 +193,43 @@ for app in "${APP_FOLDER}"app/*.groovy; do
                                 [ -n "$curName" ] && "$HPM" manifest-remove-app --name="$curName" "$PackageManifest" || true
                         fi
                         if [ -n "$ver" ]; then
-                                "$HPM" manifest-add-app --location="$url" --version="$ver" "$PackageManifest" || {
+                                "$HPM" manifest-add-app --location="$url" --version="$ver" --name="$name" --namespace="$ns" "$PackageManifest" || {
                                     echo "ERROR: Failed to add app $fname to manifest." >&2
                                     exit 2
                                 }
                         else
-                                "$HPM" manifest-add-app --location="$url" "$PackageManifest" || {
+                                "$HPM" manifest-add-app --location="$url" --name="$name" --namespace="$ns" "$PackageManifest" || {
                                     echo "ERROR: Failed to add app $fname to manifest." >&2
                                     exit 2
                                 }
                         fi
                 else
                         echo "Modifying app: $fname version=${ver:-"(none)"}"
-                        if [ -n "$ver" ]; then
-                                "$HPM" manifest-modify-app --location="$url" --version="$ver" "$PackageManifest" || {
-                                    echo "ERROR: Failed to modify app $fname in manifest." >&2
-                                    exit 2
-                                }
+                        curId=$(jq -r --arg fn "$fname" 'first(.apps[]? | select((.location|split("/")|last)==$fn) | .id) // empty' "$PackageManifest")
+                        if [ -n "$curId" ]; then
+                            if [ -n "$ver" ]; then
+                                "$HPM" manifest-modify-app --id="$curId" --location="$url" --name="$name" --namespace="$ns" --version="$ver" "$PackageManifest" || { echo "ERROR: Failed to modify app $fname" >&2; exit 2; }
+                            else
+                                "$HPM" manifest-modify-app --id="$curId" --location="$url" --name="$name" --namespace="$ns" "$PackageManifest" || { echo "ERROR: Failed to modify app $fname" >&2; exit 2; }
+                            fi
                         else
-                                "$HPM" manifest-modify-app --location="$url" "$PackageManifest" || {
-                                    echo "ERROR: Failed to modify app $fname in manifest." >&2
-                                    exit 2
-                                }
+                            # Fallback by name
+                            if [ -n "$ver" ]; then
+                                "$HPM" manifest-modify-app --name="$name" --location="$url" --namespace="$ns" --version="$ver" "$PackageManifest" || true
+                            else
+                                "$HPM" manifest-modify-app --name="$name" --location="$url" --namespace="$ns" "$PackageManifest" || true
+                            fi
                         fi
                 fi
         else
                 echo "Adding app: $fname version=${ver:-"(none)"}"
                 if [ -n "$ver" ]; then
-                        "$HPM" manifest-add-app --location="$url" --version="$ver" "$PackageManifest" || {
+                        "$HPM" manifest-add-app --location="$url" --version="$ver" --name="$name" --namespace="$ns" "$PackageManifest" || {
                             echo "ERROR: Failed to add app $fname to manifest." >&2
                             exit 2
                         }
                 else
-                        "$HPM" manifest-add-app --location="$url" "$PackageManifest" || {
+                        "$HPM" manifest-add-app --location="$url" --name="$name" --namespace="$ns" "$PackageManifest" || {
                             echo "ERROR: Failed to add app $fname to manifest." >&2
                             exit 2
                         }
