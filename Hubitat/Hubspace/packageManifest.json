@@ -17,84 +17,84 @@
   ],
   "drivers": [
     {
-      "id": "d652eaa1-fc21-424a-a08d-0f81258f5351",
+      "id": "90cadb56-a0b4-443c-9a4a-59492913fcd0",
       "name": "",
       "namespace": "",
       "location": "https://raw.githubusercontent.com/neerpatel/Hubitat/refs/heads/HubSpace/Hubitat/Hubspace/drivers/ExhaustFan.groovy",
       "required": false,
-      "version": "version: '0.1.0'"
+      "version": "0.1.0"
     },
     {
-      "id": "5f3e31e5-d6aa-4d5c-8172-98f43d382bc5",
+      "id": "32f910a0-b488-42cb-b9f1-856e91fd787a",
       "name": "HubSpace Fan",
       "namespace": "neerpatel/hubspace",
       "location": "https://raw.githubusercontent.com/neerpatel/Hubitat/refs/heads/HubSpace/Hubitat/Hubspace/drivers/Fan.groovy",
       "required": false,
-      "version": "version: \"0.1.0\""
+      "version": "0.1.0"
     },
     {
-      "id": "b3247e20-d469-4009-85dd-d85106783554",
+      "id": "12e63b96-a65b-4fc8-ab9e-0a33dae93ae0",
       "name": "HubSpace Light",
       "namespace": "neerpatel/hubspace",
       "location": "https://raw.githubusercontent.com/neerpatel/Hubitat/refs/heads/HubSpace/Hubitat/Hubspace/drivers/Light.groovy",
       "required": false,
-      "version": "version: \"0.1.0\""
+      "version": "0.1.0"
     },
     {
-      "id": "c376ac0e-0fca-456a-898c-06b518665908",
+      "id": "f8af9db9-298d-4105-b1fe-69e4755569ce",
       "name": "HubSpace Lock",
       "namespace": "neerpatel/hubspace",
       "location": "https://raw.githubusercontent.com/neerpatel/Hubitat/refs/heads/HubSpace/Hubitat/Hubspace/drivers/Lock.groovy",
       "required": false,
-      "version": "version: \"0.1.0\""
+      "version": "0.1.0"
     },
     {
-      "id": "40f724f3-f790-43c1-8723-f1f1b29c4a61",
+      "id": "7b8f0c24-6966-49f2-a545-e32f2c359d2f",
       "name": "",
       "namespace": "",
       "location": "https://raw.githubusercontent.com/neerpatel/Hubitat/refs/heads/HubSpace/Hubitat/Hubspace/drivers/PortableAC.groovy",
       "required": false,
-      "version": "version: '0.1.0'"
+      "version": "0.1.0"
     },
     {
-      "id": "cf901bf3-7f59-47f5-b7c7-aa1281a47e49",
+      "id": "78a17f2d-7059-4cc8-ac6d-b360c521e406",
       "name": "HubSpace Security System",
       "namespace": "neerpatel/hubspace",
       "location": "https://raw.githubusercontent.com/neerpatel/Hubitat/refs/heads/HubSpace/Hubitat/Hubspace/drivers/SecuritySystem.groovy",
       "required": false,
-      "version": "version: \"0.1.0\""
+      "version": "0.1.0"
     },
     {
-      "id": "39ccc24a-4a1c-4cb1-8f40-22a0eee3e95d",
+      "id": "2c18dbe6-7c56-4067-b103-eb313d842c89",
       "name": "HubSpace Security System Sensor",
       "namespace": "neerpatel/hubspace",
       "location": "https://raw.githubusercontent.com/neerpatel/Hubitat/refs/heads/HubSpace/Hubitat/Hubspace/drivers/SecuritySystemSensor.groovy",
       "required": false,
-      "version": "version: \"0.1.0\""
+      "version": "0.1.0"
     },
     {
-      "id": "d786d38d-ae83-4035-a162-94e9470bd1be",
+      "id": "9bfadb5c-4688-4315-986d-9ed10f0a5593",
       "name": "HubSpace Switch",
       "namespace": "neerpatel/hubspace",
       "location": "https://raw.githubusercontent.com/neerpatel/Hubitat/refs/heads/HubSpace/Hubitat/Hubspace/drivers/Switch.groovy",
       "required": false,
-      "version": "version: \"0.1.0\""
+      "version": "0.1.0"
     },
     {
-      "id": "74276e02-a705-4dae-8b74-a5fe323870b2",
+      "id": "6d248770-356c-452f-8402-5882d82d09fd",
       "name": "",
       "namespace": "",
       "location": "https://raw.githubusercontent.com/neerpatel/Hubitat/refs/heads/HubSpace/Hubitat/Hubspace/drivers/Thermostat.groovy",
       "required": false,
-      "version": "version: '0.1.0'"
+      "version": "0.1.0"
     },
     {
-      "id": "5528b8d9-4ec9-4083-b941-0f9a1af2a461",
+      "id": "ec5c6362-c6eb-49d2-8b98-14611fb2150f",
       "name": "HubSpace Valve",
       "namespace": "neerpatel/hubspace",
       "location": "https://raw.githubusercontent.com/neerpatel/Hubitat/refs/heads/HubSpace/Hubitat/Hubspace/drivers/Valve.groovy",
       "required": false,
-      "version": "version: \"0.1.0\""
+      "version": "0.1.0"
     }
   ]
 }
