@@ -4,7 +4,7 @@ set -euo pipefail
 
 # HubSpace Auth + API test via curl
 # Usage:
-#   HUBSPACE_USERNAME="us@meagan-neer.com" HUBSPACE_PASSWORD="q@HsXih7_TWKxZC" ./scripts/test_hubspace_auth.sh
+#   HUBSPACE_USERNAME="us@meagan-neer.com" HUBSPACE_PASSWORD="change your password" ./scripts/test_hubspace_auth.sh
 #
 # Optional:
 #   AFERO_CLIENT=hubspace (default)
