@@ -1,0 +1,8 @@
+{
+  "access_token": "REDACTED_1417",
+  "refresh_token": "REDACTED_798",
+  "id_token": "REDACTED_1171",
+  "expires_in": 120,
+  "token_type": "Bearer",
+  "scope": "openid email offline_access profile"
+}

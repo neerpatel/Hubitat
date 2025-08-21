@@ -46,6 +46,9 @@ preferences {
   page(name: "addDevicesPage")
   page(name: "addDevStatus")
   page(name: "listDevices")
+  page(name: "removeDevicesPage")
+  page(name: "removeDevStatus")
+  page(name: "uninstalled")
 }
 
 def mainPage() {
@@ -81,16 +84,41 @@ def mainPage() {
       if (getChildDevices()?.size() > 0) {
         paragraph "Discovered devices: ${getChildDevices().size()}"
       }
+      href "removeDevicesPage", title: "Remove Installed Devices", description: "Select and remove HubSpace child devices"
     }
     section("Device Discovery & Add") {
       paragraph "Use the bridge to discover HubSpace devices, then select which to add."
       href "addDevicesPage", title: "Discover and Add Devices", description: "Scan via bridge and choose devices to install"
       href "listDevices", title: "List Discovered Devices", description: "Show discovered devices and install state"
     }
+    section("Uninstall") {
+      paragraph "Uninstall all the devices"  
+      href "uninstalled", title: "Uninstall all Devices", description: "Select and remove HubSpace child devices"
+    }
   }
 }
 
-
+def uninstalled() {
+  List lines = []
+  log.info "Uninstalling all HubSpace devices"
+  def childDevice = getChildDevices().find { it.deviceNetworkId == "hubspace-${devId}" }
+  log.info "Found child device: ${childDevice.size()}"
+  getChildDevices().each {
+        log.info "Attempting to remove child device ${it.deviceNetworkId}"
+        lines << "<p style='font-size:14px'>${it.deviceNetworkId}</p>"
+        log.info "Removing child device ${it.deviceNetworkId}"
+        //deleteChildDevice(it.deviceNetworkId)
+        lines << "<p style='font-size:14px'>${it.deviceNetworkId}</p>"
+        log.info "Removed child device ${it.deviceNetworkId}"
+      }
+      lines << "<p style='font-size:14px'>All child devices removed.</p>"
+  return dynamicPage(name: "uninstalled", title: "Uninstalling Devices", install: false) {
+    section("Removing all child devices...") {
+     
+      paragraph "<p style='font-size:14px'>${lines.join('\n')}</p>"
+    }
+  }
+}
 
 // Handle app page buttons
 void appButtonHandler(String btn) {
@@ -407,6 +435,93 @@ def addDevStatus() {
       paragraph failMsg.toString()
     }
   }
+}
+
+// ===== Remove Devices Flow =====
+def removeDevicesPage() {
+  log.debug "removeDevicesPage: begin"
+  Map devices = state.devices ?: [:]
+  def installedDevices = [:]
+  devices.keySet().sort().each { String dni ->
+    def rec = devices[dni]
+    def installed = getChildDevice(dni) ? 'Yes' : 'No'
+    installedDevices[dni] = "${rec.name} - ${rec.type} [id: ${rec.id}, installed: ${installed}]"
+  }
+	
+  // getChildDevices()?.each { cd -> installed[cd.deviceNetworkId] = cd.displayName }
+  return dynamicPage(name: "removeDevicesPage",
+                     title: "Remove HubSpace Devices from Hubitat",
+                     nextPage: "removeDevStatus",
+                     install: false) {
+    section("Select Devices to Remove from Hubitat") {
+      if (!installedDevices) {
+        paragraph "No installed HubSpace devices found."
+      } else {
+        paragraph "Select devices to remove. This will delete the child device(s) from Hubitat."
+        input(
+          name: "selectedRemoveDevices", 
+          type: "enum", 
+          title: "Devices to remove (${installedDevices.size()})",
+          multiple: true, 
+          required: false, 
+          options: installedDevices)
+      }
+    }
+  }
+}
+
+def removeDevStatus() {
+  removeSelectedDevices()
+  def ok = state.removedDevices ?: []
+  def fail = state.failedRemoves ?: []
+  def okMsg = new StringBuilder()
+  def failMsg = new StringBuilder()
+  if (ok) {
+    okMsg << "<b>The following devices were removed:</b>\n"
+    ok.each { okMsg << "\t${it}\n" }
+  } else {
+    okMsg << "No devices were removed."
+  }
+  if (fail) {
+    failMsg << "<b>Failed to remove:</b>\n"
+    fail.each { m -> failMsg << "\t${m}\n" }
+  }
+  return dynamicPage(name: "removeDevStatus",
+                     title: "Removal Status",
+                     nextPage: "mainPage",
+                     install: false) {
+    section() {
+      paragraph okMsg.toString()
+      if (fail) { paragraph failMsg.toString() }
+    }
+  }
+}
+
+private void removeSelectedDevices() {
+  state.removedDevices = []
+  state.failedRemoves = []
+  def picks = settings.selectedRemoveDevices ?: []
+  if (!picks) return
+  picks.each { String dni ->
+    try {
+      log.info("Attempting to remove child device ${dni}")
+      def cd = getChildDevice(dni)
+      log.info("Attempting to remove child device ${cd}")
+      if (cd) {
+        def label = cd.displayName
+        deleteChildDevice(dni)
+        state.removedDevices << label
+        log.info "Removed child device ${label} (${dni})"
+      } else {
+        state.failedRemoves << "${dni} (not found)"
+      }
+    } catch (Throwable t) {
+      state.failedRemoves << "${dni}: ${t?.message}"
+      log.warn "Failed to remove child device ${dni}: ${t?.message}"
+    }
+    pauseExecution(150)
+  }
+  app?.removeSetting("selectedRemoveDevices")
 }
 
 def addDevices() {

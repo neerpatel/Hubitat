@@ -1,0 +1,11 @@
+Collected Afero/HubSpace API samples (client: hubspace)
+
+01_openid_login_page.html         - Initial OpenID auth HTML (PKCE flow)
+01_openid_login_headers.txt       - Response headers for OpenID GET (may include cookies)
+02_login_response_headers.txt     - Login POST response headers (Location has ?code=...)
+03_token_response_redacted.json   - Token exchange (authorization_code) with sensitive fields redacted
+04_users_me_redacted.json         - GET /v1/users/me (accountId retained; PII redacted)
+05_metadevices_with_state.json    - GET /v1/accounts/{accountId}/metadevices?expansions=state
+05b_metadevices_compact.txt       - id | class | name summary extracted from 05
+06_first_device_versions.json     - GET /v1/accounts/{accountId}/devices/{deviceId}/versions (first device)
+07_put_state_template.json        - Example payload to PUT metadevice state (only when WRITE_EXAMPLE=1)

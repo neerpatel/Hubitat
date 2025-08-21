@@ -1,0 +1,13 @@
+{
+  "accountAccess": [
+    {
+      "account": {
+        "accountId": "600337c4-1e12-4b78-8110-88fbaff4793f"
+      }
+    }
+  ],
+  "user": {
+    "id": null
+  },
+  "_note": "Sensitive fields removed"
+}

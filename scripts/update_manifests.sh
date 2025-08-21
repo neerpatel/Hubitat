@@ -123,16 +123,16 @@ for driver in "${APP_FOLDER}"drivers/*.groovy; do
                         curId=$(jq -r --arg fn "$fname" 'first(.drivers[]? | select((.location|split("/")|last)==$fn) | .id) // empty' "$PackageManifest")
                         if [ -n "$curId" ]; then
                             if [ -n "$ver" ]; then
-                                "$HPM" manifest-modify-driver --id="$curId" --location="$url" --name="$name" --namespace="$ns" --version="$ver" "$PackageManifest" || { echo "ERROR: Failed to modify driver $fname" >&2; exit 2; }
+                                "$HPM" manifest-modify-driver --id="$curId" --location="$url" --name="$name" --version="$ver" "$PackageManifest" || { echo "ERROR: Failed to modify driver $fname" >&2; exit 2; }
                             else
-                                "$HPM" manifest-modify-driver --id="$curId" --location="$url" --name="$name" --namespace="$ns" "$PackageManifest" || { echo "ERROR: Failed to modify driver $fname" >&2; exit 2; }
+                                "$HPM" manifest-modify-driver --id="$curId" --location="$url" --name="$name" "$PackageManifest" || { echo "ERROR: Failed to modify driver $fname" >&2; exit 2; }
                             fi
                         else
                             # Fallback by name
                             if [ -n "$ver" ]; then
-                                "$HPM" manifest-modify-driver --name="$name" --location="$url" --namespace="$ns" --version="$ver" "$PackageManifest" || true
+                                "$HPM" manifest-modify-driver --name="$name" --location="$url" --version="$ver" "$PackageManifest" || true
                             else
-                                "$HPM" manifest-modify-driver --name="$name" --location="$url" --namespace="$ns" "$PackageManifest" || true
+                                "$HPM" manifest-modify-driver --name="$name" --location="$url" "$PackageManifest" || true
                             fi
                         fi
                 fi
