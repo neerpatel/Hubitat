@@ -1,5 +1,21 @@
 # Release Notes
 
+## Version 0.2.5 (2025-08-24)
+
+### 🐛 Bug Fixes
+
+- **Fixed Uninstall Functionality**: Corrected the uninstall process for removing all child devices
+  - Fixed incorrect method call from `getChildDevices()` to `getAllChildDevices()`
+  - Uncommented device deletion logic to properly remove devices during uninstall
+  - Added proper logging for device removal process
+  - Improved error handling during bulk device removal
+
+### 🔧 Technical Improvements
+
+- **Enhanced Device Management**: Better handling of device lifecycle operations
+- **Improved Logging**: More detailed logging during device installation and removal processes
+- **Code Cleanup**: Fixed inconsistencies in device management code
+
 ## Version 0.2.4 (2025-08-24)
 
 ### 🎉 Initial Release Features

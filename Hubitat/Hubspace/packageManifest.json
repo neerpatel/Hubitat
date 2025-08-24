@@ -3,9 +3,9 @@
   "author": "Neer Patel",
   "minimumHEVersion": "2.3.4",
   "dateReleased": "2025-08-24",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "licenseFile": "https://raw.githubusercontent.com/joelwetzel/Hubitat-Auto-Shades/master/LICENSE",
-  "releaseNotes": "Initial release through Hubitat Package Manager.",
+  "releaseNotes": "Fixed uninstall functionality and improved bridge server optimization.",
   "communityLink": "https://community.hubitat.com/t/hubspace-integration/156320",
   "documentationLink": "https://github.com/neerpatel/Hubitat/blob/main/docs/Hubspace.md",
   "apps": [
@@ -17,7 +17,7 @@
       "required": true,
       "oauth": false,
       "primary": false,
-      "version": "0.2.4"
+      "version": "0.2.5"
     }
   ],
   "drivers": [

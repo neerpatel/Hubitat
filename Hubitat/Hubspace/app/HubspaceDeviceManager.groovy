@@ -28,7 +28,7 @@
  */
 
 // Version helper (Kasa-style): include in logs and diagnostics
-String appVersion() { return "0.2.4" }
+String appVersion() { return "0.2.5" }
 
 
 definition(
@@ -105,13 +105,13 @@ def mainPage() {
 def uninstalled() {
   List lines = []
   log.info "Uninstalling all HubSpace devices"
-  def childDevice = getChildDevices().find { it.deviceNetworkId == "hubspace-${devId}" }
+  def childDevice = getAllChildDevices()
   log.info "Found child device: ${childDevice.size()}"
-  getChildDevices().each {
+   getAllChildDevices().each {
         log.info "Attempting to remove child device ${it.deviceNetworkId}"
         lines << "<p style='font-size:14px'>${it.deviceNetworkId}</p>"
         log.info "Removing child device ${it.deviceNetworkId}"
-        //deleteChildDevice(it.deviceNetworkId)
+        deleteChildDevice(it.deviceNetworkId)
         lines << "<p style='font-size:14px'>${it.deviceNetworkId}</p>"
         log.info "Removed child device ${it.deviceNetworkId}"
       }
