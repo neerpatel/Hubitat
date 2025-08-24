@@ -7,6 +7,7 @@ const { randomBytes, createHash } = require("crypto");
 const fs = require("fs");
 const path = require("path");
 const logger = require("./winston");
+
 // Get package version
 const packageJson = require("./package.json");
 const appVersion = packageJson.version;
@@ -127,12 +128,16 @@ app.use((req, _res, next) => {
             return acc;
           }, {})
         : undefined;
+
+    // Log only safe request properties to avoid circular references
     logger.info(
       JSON.stringify({
         method: req.method,
         url: req.url,
-        req: req,
-        responseTime: Date.now() - req.startTime,
+        ip: req.ip,
+        userAgent: req.get("User-Agent"),
+        body: safeBody,
+        timestamp: new Date().toISOString(),
       })
     );
   } catch (_) {

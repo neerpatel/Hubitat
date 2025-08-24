@@ -1,6 +1,6 @@
 {
   "name": "hubitat-bridge",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "license": "AGPL-3.0",
   "scripts": {
     "start": "node server.js",
@@ -10,7 +10,7 @@
     "app-root-path": "^3.1.0",
     "cheerio": "^1.0.0-rc.12",
     "express": "^4.19.2",
-    "node-fetch": "^3.3.2",
+    "node-fetch": "^2.7.0",
     "qs": "^6.12.1",
     "uuid": "^9.0.1",
     "winston": "^3.17.0"

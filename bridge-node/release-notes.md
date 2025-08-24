@@ -1,8 +1,42 @@
 # Release Notes
 
+## Version 0.2.2 (2025-08-24)
+
+### 🐛 Bug Fixes
+
+- **Fixed Circular JSON Logging Error**: Resolved "Converting circular structure to JSON" error in request logging
+  - Removed circular references from logged request objects
+  - Now logs only safe request properties (method, url, ip, userAgent, body, timestamp)
+  - Improved error handling in logging middleware
+
+- **Fixed node-fetch Import Error**: Resolved "fetch is not a function" error
+  - Downgraded node-fetch from v3.x to v2.7.0 for proper CommonJS support
+  - Removed dependency on ES modules for better compatibility
+  - Ensured reliable HTTP client functionality
+
+### 📋 Technical Notes
+
+- **Compatibility**: All modules now use CommonJS for maximum compatibility
+- **Logging**: Request logging now avoids circular references and only logs essential data
+- **Dependencies**: Updated to use stable, CommonJS-compatible versions
+
+---
+
 ## Version 0.2.1 (2025-08-24)
 
-### 🔍 Enhanced Logging & Diagnostics
+### � Bug Fixes
+
+- **Fixed Circular JSON Logging Error**: Resolved "Converting circular structure to JSON" error in request logging
+  - Removed circular references from logged request objects
+  - Now logs only safe request properties (method, url, ip, userAgent, body, timestamp)
+  - Improved error handling in logging middleware
+
+- **Fixed node-fetch Import Error**: Resolved "fetch is not a function" error
+  - Downgraded node-fetch from v3.x to v2.7.0 for proper CommonJS support
+  - Removed dependency on ES modules for better compatibility
+  - Ensured reliable HTTP client functionality
+
+### �🔍 Enhanced Logging & Diagnostics
 
 - **Winston Logger Integration**: Added comprehensive logging system with file and console output
   - Structured logging with timestamps for all major operations
@@ -129,7 +163,7 @@
 ### 🔧 Dependencies
 
 - **express**: ^4.19.2 - Web server framework
-- **node-fetch**: ^3.3.2 - HTTP client for API calls
+- **node-fetch**: ^2.7.0 - HTTP client for API calls (downgraded from v3 for CommonJS compatibility)
 - **cheerio**: ^1.0.0-rc.12 - HTML parsing for OAuth flow
 - **qs**: ^6.12.1 - Query string parsing
 - **uuid**: ^9.0.1 - Session ID generation
