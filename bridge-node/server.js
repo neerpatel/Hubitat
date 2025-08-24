@@ -6,7 +6,7 @@ const { v4: uuidv4 } = require("uuid");
 const { randomBytes, createHash } = require("crypto");
 const fs = require("fs");
 const path = require("path");
-
+const logger = require("./winston");
 // Get package version
 const packageJson = require("./package.json");
 const appVersion = packageJson.version;
@@ -111,7 +111,7 @@ function cleanupSessions() {
   for (const [sessionId, session] of sessions.entries()) {
     if (!session.lastAccess || now - session.lastAccess > oneHour) {
       sessions.delete(sessionId);
-      console.log(`[cleanup] Removed expired session: ${sessionId}`);
+      logger.info(`[cleanup] Removed expired session: ${sessionId}`);
     }
   }
 }
@@ -127,15 +127,17 @@ app.use((req, _res, next) => {
             return acc;
           }, {})
         : undefined;
-    console.log(
-      `[${new Date().toISOString()}] ${req.method} ${
-        req.path
-      } q=${JSON.stringify(req.query)} b=${
-        safeBody ? JSON.stringify(safeBody) : ""
-      }`
+    logger.info(
+      JSON.stringify({
+        method: req.method,
+        url: req.url,
+        req: req,
+        responseTime: Date.now() - req.startTime,
+      })
     );
   } catch (_) {
     // ignore logging errors
+    logger.error("Logging error:", _);
   }
   next();
 });
@@ -335,11 +337,11 @@ app.post("/login", async (req, res) => {
   }
 
   try {
-    console.log(`[auth] Starting login for ${username}`);
+    logger.info(`[auth] Starting login for ${username}`);
     const tok = await performLogin(username, password);
     const sessionId = uuidv4();
     sessions.set(sessionId, tok);
-    console.log(`[auth] Login success for ${username}, session=${sessionId}`);
+    logger.info(`[auth] Login success for ${username}, session=${sessionId}`);
     res.json({ sessionId, accountId: tok.accountId });
   } catch (e) {
     console.error("[auth] Login failed", e);
@@ -372,7 +374,7 @@ app.get("/devices", async (req, res) => {
     });
 
     const data = await resp.json();
-    console.log(
+    logger.info(
       `[devices] account=${sess.accountId} status=${resp.status} count=${
         Array.isArray(data) ? data.length : "n/a"
       }`
@@ -427,11 +429,11 @@ app.get("/state/:id", async (req, res) => {
       },
     });
 
-    console.log(`[state] device=${deviceId} status=${resp.status}`);
+    logger.info(`[state] device=${deviceId} status=${resp.status}`);
     const json = await resp.json();
     res.json(json);
   } catch (e) {
-    console.error("[state] error", e);
+    logger.error("[state] error", e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -470,7 +472,7 @@ app.post("/command/:id", async (req, res) => {
       body: JSON.stringify(payload),
     });
 
-    console.log(
+    logger.info(
       `[command] device=${deviceId} status=${resp.status} body=${JSON.stringify(
         values
       )}`
@@ -511,6 +513,11 @@ setInterval(cleanupSessions, CONFIG.SESSION_CLEANUP_INTERVAL);
 
 // Start the server
 app.listen(CONFIG.PORT, () => {
-  console.log(`HubSpace bridge v${appVersion} listening on :${CONFIG.PORT}`);
-  console.log(`Session cleanup interval: ${CONFIG.SESSION_CLEANUP_INTERVAL}ms`);
+  logger.info(`HubSpace bridge v${appVersion} listening on :${CONFIG.PORT}`);
+  logger.info(`Session cleanup interval: ${CONFIG.SESSION_CLEANUP_INTERVAL}ms`);
+});
+
+process.on("SIGINT", () => {
+  // was SIGTERM
+  logger.info("SIGINT signal received.");
 });
