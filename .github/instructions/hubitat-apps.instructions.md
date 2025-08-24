@@ -1,6 +1,6 @@
 ---
 description: "Hubitat App - Development Guide"
-applyTo: "**"
+applyTo: "**/app/*.groovy"
 ---
 
 # Hubitat App - Development Guide

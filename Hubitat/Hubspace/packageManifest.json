@@ -1,17 +1,23 @@
 {
   "packageName": "HubSpace-Device",
   "author": "Neer Patel",
-  "minimumHEVersion": "0.0",
+  "minimumHEVersion": "2.3.4",
   "dateReleased": "2025-08-24",
+  "version": "0.2.4",
+  "licenseFile": "https://raw.githubusercontent.com/joelwetzel/Hubitat-Auto-Shades/master/LICENSE",
+  "releaseNotes": "Initial release through Hubitat Package Manager.",
+  "communityLink": "https://community.hubitat.com/t/hubspace-integration/156320",
+  "documentationLink": "https://github.com/neerpatel/Hubitat/blob/main/docs/Hubspace.md",
   "apps": [
     {
       "id": "c7a9007b-b4c6-46ad-9f51-8d0df0096098",
       "name": "HubSpace Device Manager",
       "namespace": "neerpatel/hubspace",
       "location": "https://raw.githubusercontent.com/neerpatel/Hubitat/refs/heads/main/Hubitat/Hubspace/app/HubspaceDeviceManager.groovy",
-      "required": false,
+      "required": true,
       "oauth": false,
-      "primary": false
+      "primary": false,
+      "version": "0.2.4"
     }
   ],
   "drivers": [
