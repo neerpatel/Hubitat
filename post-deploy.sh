@@ -3,5 +3,5 @@ if [ ! -f .env ]; then
 fi
 
 echo "Running npm install"
-cd ./app && npm install
+cd ./bridge-node && npm install
 cd ..

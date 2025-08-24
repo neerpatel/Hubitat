@@ -28,5 +28,5 @@ fi
 curl -sL https://raw.githubusercontent.com/neerpatel/Hubitat/main/bridge-node/ecosystem.config.js -O
 pm2 deploy production setup
 
-cd /opt/Hubitat/app/
+cd /opt/Hubitat/bridge-node/
 pm2 deploy production

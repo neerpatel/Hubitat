@@ -13,7 +13,7 @@ module.exports = {
     {
       name: "hubitat-bridge",
       cwd: __dirname,
-      script: "hubspace-server.js",
+      script: "server.js",
       exec_mode: "fork",
       instances: 1,
       watch: false,
