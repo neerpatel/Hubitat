@@ -639,11 +639,47 @@ private processStateValue(cd, String functionClass, String functionInstance, val
       if (functionInstance == "ac-fan-speed") {
         cd.sendEvent(name: "thermostatFanMode", value: value as String)
       } else {
-        cd.sendEvent(name: "speed", value: (value as String))
+        // value pattern: fan-speed-<maxLevels>-<percent>
+        String v = (value as String)
+        Integer maxLevels = null
+        Integer percent = null
+        try {
+          def m = (v =~ /fan-speed-(\d+)-(\d{1,3})/)
+          if (m && m.size() > 0) {
+            maxLevels = (m[0][1] as Integer)
+            percent = (m[0][2] as Integer)
+          }
+        } catch (ignored) {}
+
+        if (maxLevels != null) {
+          try { cd.updateDataValue('fanMaxLevels', String.valueOf(maxLevels)) } catch (ignored) {}
+        }
+
+        // Map percent to Hubitat FanControl speed names
+        String speedName = null
+        if (maxLevels == null) {
+          speedName = cd.currentValue('speed') ?: 'off'
+        } else if (maxLevels >= 6) {
+          if      (percent <= 16) speedName = 'low'
+          else if (percent <= 33) speedName = 'medium-low'
+          else if (percent <= 50) speedName = 'medium'
+          else if (percent <= 66) speedName = 'medium-high'
+          else if (percent <= 83) speedName = 'high'
+          else                    speedName = 'on' // treat max as 'on'
+        } else { // assume 3 levels
+          if      (percent <= 33) speedName = 'low'
+          else if (percent <= 66) speedName = 'medium'
+          else                    speedName = 'high'
+        }
+        if (speedName) { cd.sendEvent(name: "speed", value: speedName) }
       }
       break
     case "fan-direction":
       cd.sendEvent(name: "direction", value: value as String)
+      break
+    case "fan-reverse":
+      // Some fans report/use 'fan-reverse' instead of 'fan-direction'
+      cd.sendEvent(name: "direction", value: (value as String))
       break
     case "lock":
       cd.sendEvent(name: "lock", value: value == "locked" ? "locked" : "unlocked")

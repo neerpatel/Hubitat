@@ -13,10 +13,10 @@
  * ====================================================================
  */
 
-String driverVer() { return "0.1.0" }
+String driverVer() { return "0.2.0" }
 
 metadata {
-  definition(name: "HubSpace Fan", namespace: "neerpatel/hubspace", author: "Neer Patel", version: "0.1.0") {
+  definition(name: "HubSpace Fan", namespace: "neerpatel/hubspace", author: "Neer Patel", version: driverVer()) {
     capability "Initialize"
     capability "Switch"
     capability "FanControl"
@@ -25,6 +25,8 @@ metadata {
     capability "PresenceSensor"
     
     command "setDirection", ["string"] // forward, reverse
+    command "forward"
+    command "reverse"
 
     attribute "direction", "string"
 
@@ -51,59 +53,63 @@ def refresh() {
 
 def on() { 
   log.info "Turning on ${device.displayName} (drv v${driverVer()})"
-  parent.sendHsCommand(id(), "power", [value: "on"]) 
+  parent.sendHsCommand(id(), "power", [instance: "fan-power", value: "on"]) 
 }
 
 def off() { 
   log.info "Turning off ${device.displayName} (drv v${driverVer()})"
-  parent.sendHsCommand(id(), "power", [value: "off"]) 
+  parent.sendHsCommand(id(), "power", [instance: "fan-power", value: "off"]) 
 }
 
 def setSpeed(speed) {
   log.info "Setting fan speed to ${speed} for ${device.displayName} (drv v${driverVer()})"
   
-  // Convert Hubitat speed names to numeric values for HubSpace API
-  def speedValue
-  switch (speed?.toLowerCase()) {
-    case "off":
-      speedValue = 0
-      break
-    case "low":
-      speedValue = 1
-      break
-    case "medium-low":
-      speedValue = 2
-      break
-    case "medium":
-      speedValue = 3
-      break
-    case "medium-high":
-      speedValue = 4
-      break
-    case "high":
-      speedValue = 5
-      break
-    case "auto":
-      speedValue = "auto"
-      break
+  // Determine device's max levels from data value (set by parent app during state updates)
+  Integer maxLevels = (device.getDataValue('fanMaxLevels') ?: '6') as Integer
+
+  // Map Hubitat speed name/number to a level index (1..maxLevels). 0 means off.
+  Integer level = null
+  def s = (speed instanceof String) ? speed?.toLowerCase() : speed
+  switch (s) {
+    case 'off': level = 0; break
+    case 'low': level = 1; break
+    case 'medium-low': level = Math.min(2, maxLevels); break
+    case 'medium': level = Math.min(3, maxLevels); break
+    case 'medium-high': level = Math.min(4, maxLevels); break
+    case 'high': level = (maxLevels >= 5) ? 5 : maxLevels; break
+    case 'on': level = maxLevels; break
     default:
-      // If it's a number, use it directly
-      if (speed?.isNumber()) {
-        speedValue = speed as int
-      } else {
-        log.warn "Unknown fan speed: ${speed}, defaulting to medium"
-        speedValue = 3
+      if (s instanceof Number || (s instanceof String && s.isNumber())) {
+        level = (s as Integer)
       }
+      break
   }
-  
-  if (speedValue == 0) {
+  if (level == null) { level = (maxLevels >= 3 ? 3 : 1) }
+
+  if (level <= 0) {
     off()
-  } else {
-    parent.sendHsCommand(id(), "fan-speed", [value: speedValue])
-    if (device.currentValue("switch") != "on") {
-      on()
-    }
+    return
   }
+
+  // Compute percent ladder and payload value "fan-speed-{maxLevels}-{percent}" (percent is zero-padded to 3 digits)
+  int pct
+  if (maxLevels >= 6) {
+    int[] ladder = [16, 33, 50, 66, 83, 100]
+    int idx = Math.max(1, Math.min(level, 6)) - 1
+    pct = ladder[idx]
+    maxLevels = 6
+  } else { // assume 3-speed device
+    int[] ladder = [33, 66, 100]
+    int idx = Math.max(1, Math.min(level, 3)) - 1
+    pct = ladder[idx]
+    maxLevels = 3
+  }
+  String pctStr = String.format('%03d', pct)
+  String apiValue = "fan-speed-${maxLevels}-${pctStr}"
+
+  // Ensure power on then set speed
+  if (device.currentValue("switch") != "on") { on() }
+  parent.sendHsCommand(id(), "fan-speed", [instance: "fan-speed", value: apiValue])
 }
 
 def cycleSpeed() {
@@ -115,9 +121,14 @@ def cycleSpeed() {
 }
 
 def setDirection(direction) {
-  log.info "Setting fan direction to ${direction} for ${device.displayName} (drv v${driverVer()})"
-  parent.sendHsCommand(id(), "fan-direction", [value: direction])
+  def d = (direction as String)?.toLowerCase()
+  log.info "Setting fan direction to ${d} for ${device.displayName} (drv v${driverVer()})"
+  // Many HubSpace fans use functionClass 'fan-reverse' with instance 'fan-reverse'
+  parent.sendHsCommand(id(), "fan-reverse", [instance: "fan-reverse", value: d])
 }
+
+def forward() { setDirection('forward') }
+def reverse() { setDirection('reverse') }
 
 private id() { 
   device.deviceNetworkId - "hubspace-" 

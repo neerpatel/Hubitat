@@ -52,12 +52,12 @@ def refresh() { parent.pollChild(device) }
 
 def on() { 
   log.info "Turning on ${device.displayName} (drv v${driverVer()})"
-  parent.sendHsCommand(id(), "power", [value: "on"]) 
+  parent.sendHsCommand(id(), "power", [instance: "light-power", value: "on"]) 
 }
 
 def off() { 
   log.info "Turning off ${device.displayName} (drv v${driverVer()})"
-  parent.sendHsCommand(id(), "power", [value: "off"]) 
+  parent.sendHsCommand(id(), "power", [instance: "light-power", value: "off"]) 
 }
 
 def setLevel(v, dur=null) {
