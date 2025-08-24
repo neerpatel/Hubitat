@@ -46,8 +46,20 @@ metadata {
         command 'setMotionAction', [[name: 'action', type: 'ENUM', constraints: ['off','on','timer']]]
         command 'setHumiditySensitivity', [[name: 'level', type: 'ENUM', constraints: ['low','medium','high']]]
     }
+    preferences {
+        input name: 'devicePollSeconds', type: 'number', title: 'Device refresh interval (sec)', description: 'Override app polling for this device', required: false
+    }
 }
 def initialize() { log.debug "Initializing HubSpace Exhaust Fan v${driverVer()}" }
+def updated() {
+    try {
+        if (settings?.devicePollSeconds) {
+            device.updateDataValue('devicePollSeconds', String.valueOf((settings.devicePollSeconds as int)))
+        } else {
+            device.removeDataValue('devicePollSeconds')
+        }
+    } catch (ignored) {}
+}
 def refresh() { parent.pollChild(device) }
 
 // Commands for numbers (e.g., auto-off-timer)

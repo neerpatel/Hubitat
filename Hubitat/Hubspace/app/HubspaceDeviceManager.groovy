@@ -154,6 +154,7 @@ def initialize() {
   // Seed discovery list on init so the Add Devices page has content
   discoverDevices()
   if (state.knownIds == null) state.knownIds = []
+  if (state.lastPolled == null) state.lastPolled = [:]
   schedule("*/${Math.max(15, pollSeconds)} * * * * ?", pollAll)
   // Health monitor
   schedule("*/${Math.max(30, (settings.healthSeconds ?: 120) as int)} * * * * ?", healthCheck)
@@ -271,7 +272,22 @@ def pollAll() {
     log.warn "Cannot poll devices - no Node bridge session"
     return
   }
-  getChildDevices()?.each { c -> pollChild(c) }
+  if (state.lastPolled == null) state.lastPolled = [:]
+  Long nowMs = now()
+  Integer defaultSec = ((settings.pollSeconds ?: 30) as int)
+  getChildDevices()?.each { cd ->
+    Integer devSec = null
+    try {
+      def v = cd.getDataValue('devicePollSeconds')
+      if (v && v.isInteger()) { devSec = (v as Integer) }
+    } catch (ignored) {}
+    int interval = (devSec ?: defaultSec)
+    Long last = (state.lastPolled[cd.deviceNetworkId] ?: 0L) as Long
+    if (last == 0L || (nowMs - last) >= (interval * 1000L)) {
+      pollChild(cd)
+      state.lastPolled[cd.deviceNetworkId] = nowMs
+    }
+  }
 }
 
 def pollChild(cd) {

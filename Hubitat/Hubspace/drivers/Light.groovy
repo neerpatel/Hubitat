@@ -43,10 +43,20 @@ metadata {
   }
   preferences {
     input name: "transitionMs", type: "number", title: "Fade (ms)", defaultValue: 300
+    input name: "devicePollSeconds", type: "number", title: "Device refresh interval (sec)", description: "Override app polling for this device", required: false
   }
 }
 
 def initialize() { log.debug "Initializing HubSpace Light v${driverVer()}" }
+def updated() {
+  try {
+    if (settings?.devicePollSeconds) {
+      device.updateDataValue("devicePollSeconds", String.valueOf((settings.devicePollSeconds as int)))
+    } else {
+      device.removeDataValue("devicePollSeconds")
+    }
+  } catch (ignored) {}
+}
 
 def refresh() { parent.pollChild(device) }
 

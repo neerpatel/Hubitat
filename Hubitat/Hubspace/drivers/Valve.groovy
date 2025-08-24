@@ -44,8 +44,20 @@ metadata {
     command "setDuration", [[name:"duration", type:"NUMBER", description:"Timer duration in minutes"]]
     command "startWithDuration", [[name:"duration", type:"NUMBER", description:"Start watering with duration in minutes"]]
   }
+  preferences {
+    input name: "devicePollSeconds", type: "number", title: "Device refresh interval (sec)", description: "Override app polling for this device", required: false
+  }
 }
 def initialize() { log.debug "Initializing HubSpace Valve v${driverVer()}" }
+def updated() {
+  try {
+    if (settings?.devicePollSeconds) {
+      device.updateDataValue("devicePollSeconds", String.valueOf((settings.devicePollSeconds as int)))
+    } else {
+      device.removeDataValue("devicePollSeconds")
+    }
+  } catch (ignored) {}
+}
 
 def refresh() { parent.pollChild(device) }
 

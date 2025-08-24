@@ -47,8 +47,20 @@ metadata {
     command "setChirpMode", [[name:"mode", type:"ENUM", constraints:["off", "on"]]]
     command "setBypassMode", [[name:"mode", type:"ENUM", constraints:["off", "on"]]]
   }
+  preferences {
+    input name: "devicePollSeconds", type: "number", title: "Device refresh interval (sec)", description: "Override app polling for this device", required: false
+  }
 }
 def initialize() { log.debug "Initializing HubSpace Security System Sensor v${driverVer()}" }
+def updated() {
+  try {
+    if (settings?.devicePollSeconds) {
+      device.updateDataValue("devicePollSeconds", String.valueOf((settings.devicePollSeconds as int)))
+    } else {
+      device.removeDataValue("devicePollSeconds")
+    }
+  } catch (ignored) {}
+}
 
 def refresh() { parent.pollChild(device) }
 
