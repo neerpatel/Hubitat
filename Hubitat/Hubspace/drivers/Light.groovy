@@ -17,7 +17,7 @@
 String deviceVer() { return "0.1.2" }
 
 metadata {
-  definition(name: "HubSpace Light", namespace: "neerpatel/hubspace", author: "Neer Patel", version: deviceVer()) {
+  definition(name: "HubSpace Light", namespace: "neerpatel/hubspace", author: "Neer Patel", version: deviceVer(), importUrl: "https://raw.githubusercontent.com/neerpatel/Hubitat/refs/heads/main/Hubitat/Hubspace/drivers/Light.groovy") {
     capability "Initialize"
     capability "Switch"
     capability "Switch Level"

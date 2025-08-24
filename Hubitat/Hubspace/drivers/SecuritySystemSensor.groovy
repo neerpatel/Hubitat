@@ -16,7 +16,7 @@
 String deviceVer() { return "0.1.1" }
 
 metadata {
-  definition(name: "HubSpace Security System Sensor", namespace: "neerpatel/hubspace", author: "Neer Patel", version: deviceVer()) {
+  definition(name: "HubSpace Security System Sensor", namespace: "neerpatel/hubspace", author: "Neer Patel", version: deviceVer(), importUrl: "https://raw.githubusercontent.com/neerpatel/Hubitat/refs/heads/main/Hubitat/Hubspace/drivers/SecuritySystemSensor.groovy") {
     capability "Initialize"
     capability "ContactSensor"
     capability "MotionSensor"

@@ -16,7 +16,7 @@
 String deviceVer() { return "0.2.1" }
 
 metadata {
-  definition(name: "HubSpace Fan", namespace: "neerpatel/hubspace", author: "Neer Patel", version: deviceVer()) {
+  definition(name: "HubSpace Fan", namespace: "neerpatel/hubspace", author: "Neer Patel", version: deviceVer(), importUrl: 'https://raw.githubusercontent.com/neerpatel/Hubitat/refs/heads/main/Hubitat/Hubspace/drivers/Fan.groovy') {
     capability "Initialize"
     capability "Switch"
     capability "FanControl"

@@ -16,7 +16,7 @@
 String deviceVer() { return "0.1.1" }
 
 metadata {
-  definition(name: "HubSpace Security System", namespace: "neerpatel/hubspace", author: "Neer Patel", version: deviceVer()) {
+  definition(name: "HubSpace Security System", namespace: "neerpatel/hubspace", author: "Neer Patel", version: deviceVer(), importUrl: "https://raw.githubusercontent.com/neerpatel/Hubitat/refs/heads/main/Hubitat/Hubspace/drivers/SecuritySystem.groovy") {
     capability "Initialize"
     capability "SecurityKeypad"
     capability "Refresh"

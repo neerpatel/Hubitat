@@ -16,7 +16,7 @@
 String deviceVer() { return "0.1.1" }
 
 metadata {
-  definition(name: "HubSpace Valve", namespace: "neerpatel/hubspace", author: "Neer Patel", version: deviceVer()) {
+  definition(name: "HubSpace Valve", namespace: "neerpatel/hubspace", author: "Neer Patel", version: deviceVer(), importUrl: "https://raw.githubusercontent.com/neerpatel/Hubitat/refs/heads/main/Hubitat/Hubspace/drivers/Valve.groovy") {
     capability "Initialize"
     capability "Valve"
     capability "Switch"

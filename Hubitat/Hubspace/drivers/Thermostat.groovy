@@ -18,7 +18,7 @@
 String deviceVer() { return "0.1.1" }
 
 metadata {
-    definition(name: 'HubSpace Thermostat', namespace: 'neerpatel/hubspace', author: 'Neer Patel', version: deviceVer()) {
+    definition(name: 'HubSpace Thermostat', namespace: 'neerpatel/hubspace', author: 'Neer Patel', version: deviceVer(), importUrl: "https://raw.githubusercontent.com/neerpatel/Hubitat/refs/heads/main/Hubitat/Hubspace/drivers/Thermostat.groovy") {
         capability 'Initialize'
         capability 'Refresh'
         capability 'Thermostat'

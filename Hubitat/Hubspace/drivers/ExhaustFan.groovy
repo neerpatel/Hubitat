@@ -17,7 +17,8 @@ String deviceVer() { return "0.1.1" }
 
 metadata {
     definition(name: 'HubSpace Exhaust Fan', namespace: 'neerpatel/hubspace', author: 'Neer Patel', 
-               importUrl: 'https://raw.githubusercontent.com/neerpatel/Hubitat/refs/heads/HubSpace/Hubitat/Hubspace/drivers/ExhaustFan.groovy') {
+               importUrl: 'https://raw.githubusercontent.com/neerpatel/Hubitat/refs/heads/main/Hubitat/Hubspace/drivers/ExhaustFan.groovy'
+               , version: deviceVer()) {
         capability 'Initialize'
         capability 'Refresh'
         capability 'MotionSensor' // for motion-detection
