@@ -1,100 +1,105 @@
 {
   "packageName": "HubSpace-Device",
   "author": "Neer Patel",
-  "minimumHEVersion": "0.0",
-  "dateReleased": "2025-08-18",
+  "minimumHEVersion": "2.3.4",
+  "dateReleased": "2025-08-24",
+  "version": "0.2.4",
+  "licenseFile": "https://raw.githubusercontent.com/joelwetzel/Hubitat-Auto-Shades/master/LICENSE",
+  "releaseNotes": "Initial release through Hubitat Package Manager.",
+  "communityLink": "https://community.hubitat.com/t/hubspace-integration/156320",
+  "documentationLink": "https://github.com/neerpatel/Hubitat/blob/main/docs/Hubspace.md",
   "apps": [
     {
-      "id": "991e7bf0-9d4e-4a77-88ee-6c7a1d306df5",
+      "id": "c7a9007b-b4c6-46ad-9f51-8d0df0096098",
       "name": "HubSpace Device Manager",
       "namespace": "neerpatel/hubspace",
-      "location": "https://raw.githubusercontent.com/neerpatel/Hubitat/refs/heads/HubSpace/Hubitat/Hubspace/app/HubspaceDeviceManager.groovy",
+      "location": "https://raw.githubusercontent.com/neerpatel/Hubitat/refs/heads/main/Hubitat/Hubspace/app/HubspaceDeviceManager.groovy",
       "required": true,
       "oauth": false,
-      "primary": true,
-      "version": "0.1.0"
+      "primary": false,
+      "version": "0.2.4"
     }
   ],
   "drivers": [
     {
-      "id": "90cadb56-a0b4-443c-9a4a-59492913fcd0",
+      "id": "4e090ceb-521b-4e70-8514-856b4b304f45",
       "name": "HubSpace Exhaust Fan",
       "namespace": "neerpatel/hubspace",
-      "location": "https://raw.githubusercontent.com/neerpatel/Hubitat/refs/heads/HubSpace/Hubitat/Hubspace/drivers/ExhaustFan.groovy",
+      "location": "https://raw.githubusercontent.com/neerpatel/Hubitat/refs/heads/main/Hubitat/Hubspace/drivers/ExhaustFan.groovy",
       "required": false,
-      "version": "0.1.0"
+      "version": "0.1.1"
     },
     {
-      "id": "32f910a0-b488-42cb-b9f1-856e91fd787a",
+      "id": "b445497a-e95b-4cee-83c9-407af5441b3c",
       "name": "HubSpace Fan",
       "namespace": "neerpatel/hubspace",
-      "location": "https://raw.githubusercontent.com/neerpatel/Hubitat/refs/heads/HubSpace/Hubitat/Hubspace/drivers/Fan.groovy",
+      "location": "https://raw.githubusercontent.com/neerpatel/Hubitat/refs/heads/main/Hubitat/Hubspace/drivers/Fan.groovy",
       "required": false,
-      "version": "0.1.0"
+      "version": "0.2.1"
     },
     {
-      "id": "12e63b96-a65b-4fc8-ab9e-0a33dae93ae0",
+      "id": "448dc154-8dd9-4864-8eda-8e2b09434ba5",
       "name": "HubSpace Light",
       "namespace": "neerpatel/hubspace",
-      "location": "https://raw.githubusercontent.com/neerpatel/Hubitat/refs/heads/HubSpace/Hubitat/Hubspace/drivers/Light.groovy",
+      "location": "https://raw.githubusercontent.com/neerpatel/Hubitat/refs/heads/main/Hubitat/Hubspace/drivers/Light.groovy",
       "required": false,
-      "version": "0.1.0"
+      "version": "0.1.2"
     },
     {
-      "id": "f8af9db9-298d-4105-b1fe-69e4755569ce",
+      "id": "d4857bd9-c4bd-4bab-9f80-20b30b3cc241",
       "name": "HubSpace Lock",
       "namespace": "neerpatel/hubspace",
-      "location": "https://raw.githubusercontent.com/neerpatel/Hubitat/refs/heads/HubSpace/Hubitat/Hubspace/drivers/Lock.groovy",
+      "location": "https://raw.githubusercontent.com/neerpatel/Hubitat/refs/heads/main/Hubitat/Hubspace/drivers/Lock.groovy",
       "required": false,
-      "version": "0.1.0"
+      "version": "0.1.1"
     },
     {
-      "id": "7b8f0c24-6966-49f2-a545-e32f2c359d2f",
+      "id": "d67d23dd-089a-49ef-b0ae-a01ffbdcddc7",
       "name": "HubSpace Portable AC",
       "namespace": "neerpatel/hubspace",
-      "location": "https://raw.githubusercontent.com/neerpatel/Hubitat/refs/heads/HubSpace/Hubitat/Hubspace/drivers/PortableAC.groovy",
+      "location": "https://raw.githubusercontent.com/neerpatel/Hubitat/refs/heads/main/Hubitat/Hubspace/drivers/PortableAC.groovy",
       "required": false,
-      "version": "0.1.0"
+      "version": "0.1.1"
     },
     {
-      "id": "78a17f2d-7059-4cc8-ac6d-b360c521e406",
+      "id": "a027816a-abfc-4b09-9998-55a40a5a069a",
       "name": "HubSpace Security System",
       "namespace": "neerpatel/hubspace",
-      "location": "https://raw.githubusercontent.com/neerpatel/Hubitat/refs/heads/HubSpace/Hubitat/Hubspace/drivers/SecuritySystem.groovy",
+      "location": "https://raw.githubusercontent.com/neerpatel/Hubitat/refs/heads/main/Hubitat/Hubspace/drivers/SecuritySystem.groovy",
       "required": false,
-      "version": "0.1.0"
+      "version": "0.1.1"
     },
     {
-      "id": "2c18dbe6-7c56-4067-b103-eb313d842c89",
+      "id": "3e91ea37-7f22-4859-9e5a-f5fa416a7df8",
       "name": "HubSpace Security System Sensor",
       "namespace": "neerpatel/hubspace",
-      "location": "https://raw.githubusercontent.com/neerpatel/Hubitat/refs/heads/HubSpace/Hubitat/Hubspace/drivers/SecuritySystemSensor.groovy",
+      "location": "https://raw.githubusercontent.com/neerpatel/Hubitat/refs/heads/main/Hubitat/Hubspace/drivers/SecuritySystemSensor.groovy",
       "required": false,
-      "version": "0.1.0"
+      "version": "0.1.1"
     },
     {
-      "id": "9bfadb5c-4688-4315-986d-9ed10f0a5593",
+      "id": "de611581-4ce2-4783-92d9-03ff17b4da57",
       "name": "HubSpace Switch",
       "namespace": "neerpatel/hubspace",
-      "location": "https://raw.githubusercontent.com/neerpatel/Hubitat/refs/heads/HubSpace/Hubitat/Hubspace/drivers/Switch.groovy",
+      "location": "https://raw.githubusercontent.com/neerpatel/Hubitat/refs/heads/main/Hubitat/Hubspace/drivers/Switch.groovy",
       "required": false,
-      "version": "0.1.0"
+      "version": "0.1.1"
     },
     {
-      "id": "6d248770-356c-452f-8402-5882d82d09fd",
+      "id": "6e758465-85a1-40fb-8878-15ba0ff3b709",
       "name": "HubSpace Thermostat",
       "namespace": "neerpatel/hubspace",
-      "location": "https://raw.githubusercontent.com/neerpatel/Hubitat/refs/heads/HubSpace/Hubitat/Hubspace/drivers/Thermostat.groovy",
+      "location": "https://raw.githubusercontent.com/neerpatel/Hubitat/refs/heads/main/Hubitat/Hubspace/drivers/Thermostat.groovy",
       "required": false,
-      "version": "0.1.0"
+      "version": "0.1.1"
     },
     {
-      "id": "ec5c6362-c6eb-49d2-8b98-14611fb2150f",
+      "id": "93f81487-9501-4d7c-a8f6-de3fc21b3e25",
       "name": "HubSpace Valve",
       "namespace": "neerpatel/hubspace",
-      "location": "https://raw.githubusercontent.com/neerpatel/Hubitat/refs/heads/HubSpace/Hubitat/Hubspace/drivers/Valve.groovy",
+      "location": "https://raw.githubusercontent.com/neerpatel/Hubitat/refs/heads/main/Hubitat/Hubspace/drivers/Valve.groovy",
       "required": false,
-      "version": "0.1.0"
+      "version": "0.1.1"
     }
   ]
 }

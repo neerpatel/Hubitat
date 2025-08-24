@@ -1,6 +1,6 @@
 ---
 description: "Hubitat Driver - Development Guide"
-applyTo: "**"
+applyTo: "**/drivers/*.groovy"
 ---
 
 # Hubitat Driver - Development Guide
