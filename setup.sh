@@ -18,7 +18,7 @@ fi
 if [ ! -d "/opt/Hubitat" ]; then
   echo "/opt/Hubitat does not exist."
   sudo mkdir /opt/Hubitat
-  sudo chown pi:pi /opt/Hubitat
+  sudo chown pi:pi /opt/Hubitat -R
 fi
 if [ "$(stat -c '%U:%G' /opt/Hubitat)" != "pi:pi" ]; then
     echo "Updating folder ownership for /opt/Hubitat and sub"
@@ -28,5 +28,5 @@ fi
 curl -sL https://raw.githubusercontent.com/neerpatel/Hubitat/main/bridge-node/ecosystem.config.js -O
 pm2 deploy production setup
 
-cd /opt/Hubitat/bridge-node/
+cd /opt/Hubitat/source/bridge-node/
 pm2 deploy production
