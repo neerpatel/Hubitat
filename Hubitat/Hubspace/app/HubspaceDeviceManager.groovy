@@ -24,7 +24,7 @@
  */
 
 // Version helper (Kasa-style): include in logs and diagnostics
-String appVersion() { return "0.1.0" }
+String appVersion() { return "0.2.0" }
 
 
 definition(
@@ -370,6 +370,13 @@ void refreshIndexAndDiscover() {
     String name = (
       d.friendlyName ?: d.friendly_name ?: d?.description?.device?.friendlyName ?: d.default_name ?: (id ? "HubSpace ${id}" : null)
     )?.toString()
+    String deviceId = (d.deviceId ?: d.device_id)?.toString()
+    List children = []
+    try {
+      if (d.children instanceof List) {
+        children = d.children.collect { it?.toString() }.findAll { it }
+      }
+    } catch (ignored) {}
     if (!id || !type) { return }
 
     String dni = "hubspace-${id}"
@@ -378,6 +385,8 @@ void refreshIndexAndDiscover() {
       id: id,
       type: type,
       name: name ?: dni,
+      deviceId: deviceId,
+      children: children,
       raw: d
     ]
   }
@@ -393,9 +402,15 @@ def addDevicesPage() {
 
   Map devices = state.devices ?: [:]
   Map uninstalled = [:]
-  devices.each { k, v ->
+  // Build a set of child DNIs from parent devices so we only list parents/standalone
+  Set childDnis = [] as Set
+  devices.each { String k, Map v ->
+    (v.children ?: []).each { String cid -> childDnis << "hubspace-${cid}" }
+  }
+  devices.each { String k, Map v ->
     def child = getChildDevice(k)
-    if (!child) {
+    // Skip if already installed, or if this record is a child of a known parent
+    if (!child && !childDnis.contains(k)) {
       uninstalled[k] = "${v.name ?: v.id}, ${v.type}"
     }
   }
@@ -535,16 +550,42 @@ def addDevices() {
     def rec = devices[dni]
     if (!rec) { state.failedAdds << [dni: dni, reason: 'not in discovery']; return }
     try {
-      String driver = driverForType(rec.type as String)
-      def added = addChildDevice(
-        "neerpatel/hubspace",
-        driver,
-        dni,
-        [label: rec.name ?: dni, isComponent: false]
-      )
-      added?.updateDataValue("hsType", rec.type as String)
-      state.addedDevices << [label: rec.name, id: rec.id]
-      log.info "Installed ${rec.name} (${rec.type})"
+      List created = []
+      List children = (rec.children instanceof List) ? rec.children : []
+      if (children && children.size() > 0) {
+        // Create a Hubitat device for each child metadevice under this parent
+        children.each { String cid ->
+          String cdni = "hubspace-${cid}"
+          def crec = devices[cdni]
+          if (!crec) { return }
+          if (getChildDevice(cdni)) { return }
+          String cdriver = driverForType(crec.type as String)
+          def cadded = addChildDevice(
+            "neerpatel/hubspace",
+            cdriver,
+            cdni,
+            [label: crec.name ?: cdni, isComponent: false]
+          )
+          cadded?.updateDataValue("hsType", crec.type as String)
+          if (rec.id) { cadded?.updateDataValue("hsParentId", rec.id as String) }
+          created << (crec.name ?: cdni)
+          log.info "Installed child ${crec.name} (${crec.type}) for parent ${rec.name}"
+          pauseExecution(150)
+        }
+      } else {
+        // Standalone device; create directly
+        String driver = driverForType(rec.type as String)
+        def added = addChildDevice(
+          "neerpatel/hubspace",
+          driver,
+          dni,
+          [label: rec.name ?: dni, isComponent: false]
+        )
+        added?.updateDataValue("hsType", rec.type as String)
+        created << (rec.name ?: dni)
+        log.info "Installed ${rec.name} (${rec.type})"
+      }
+      created.each { state.addedDevices << [label: it, id: rec.id] }
     } catch (Throwable t) {
       state.failedAdds << [label: rec?.name, driver: rec?.type, id: rec?.id, error: t?.message]
       log.warn "Failed to add ${rec?.name}: ${t?.message}"
