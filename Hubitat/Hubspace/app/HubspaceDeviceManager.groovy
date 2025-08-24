@@ -36,7 +36,7 @@ definition(
   namespace: "neerpatel/hubspace",
   author: "Neer Patel",
   version: appVersion(),
-  importUrl: "https://raw.githubusercontent.com/neerpatel/hubspace/main/Hubitat/app/Hubspace/HubspaceDeviceManager.groovy", 
+  importUrl: "https://raw.githubusercontent.com/neerpatel/Hubitat/refs/heads/main/Hubitat/Hubspace/app/HubspaceDeviceManager.groovy", 
   description: "Discover and control HubSpace devices via cloud API",
   iconUrl: "",
   iconX2Url: "",
