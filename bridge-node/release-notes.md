@@ -17,7 +17,16 @@
   - `POST /command/:id` - Send device commands to HubSpace cloud
   - `GET /health` - Health check and server status
 
-### 🔧 Core Features
+### � Optimizations & Improvements
+
+- **CommonJS Module System**: No longer requires ES module configuration (`"type": "module"`)
+- **Improved Code Organization**: Logical separation of utility functions, authentication, and API endpoints
+- **Enhanced Session Management**: Automatic cleanup of expired sessions with configurable intervals
+- **Better Error Handling**: More descriptive error messages and improved logging
+- **Performance Improvements**: Optimized token refresh logic with configurable buffer times
+- **Structured Configuration**: Centralized configuration constants for easier maintenance
+
+### �🔧 Core Features
 
 - **Session Management**: UUID-based session tracking with automatic cleanup
 - **Device Discovery**: Complete device enumeration with metadata normalization
