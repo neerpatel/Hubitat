@@ -6,8 +6,8 @@
  *                ThermostatOperatingState, ThermostatSetpoint
  *  Purpose:
  *  - Map Hubitat thermostat controls to HubSpace function classes:
- *    "temperature" (instances: heating-target, cooling-target, auto-*)
- *    "mode", "fan-mode".
+ *    'temperature' (instances: heating-target, cooling-target, auto-*)
+ *    'mode', 'fan-mode'.
  *  - Versioned logging via driverVer() for diagnostics.
  *
  *  Notes:
