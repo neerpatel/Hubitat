@@ -13,10 +13,10 @@
  * ====================================================================
  */
 
-String driverVer() { return "0.1.0" }
+String deviceVer() { return "0.1.1" }
 
 metadata {
-  definition(name: "HubSpace Security System Sensor", namespace: "neerpatel/hubspace", author: "Neer Patel", version: "0.1.0") {
+  definition(name: "HubSpace Security System Sensor", namespace: "neerpatel/hubspace", author: "Neer Patel", version: deviceVer()) {
     capability "Initialize"
     capability "ContactSensor"
     capability "MotionSensor"
@@ -51,7 +51,7 @@ metadata {
     input name: "devicePollSeconds", type: "number", title: "Device refresh interval (sec)", description: "Override app polling for this device", required: false
   }
 }
-def initialize() { log.debug "Initializing HubSpace Security System Sensor v${driverVer()}" }
+def initialize() { log.debug "Initializing HubSpace Security System Sensor v${deviceVer()}" }
 def updated() {
   try {
     if (settings?.devicePollSeconds) {
@@ -65,7 +65,8 @@ def updated() {
 def refresh() { parent.pollChild(device) }
 
 def setTriggerMode(mode) {
-  log.info "Setting trigger mode to ${mode} for ${device.displayName} (drv v${driverVer()})"
+  log.info "Setting trigger mode to ${mode} for ${device.displayName} (drv v${deviceVer()})"
+  sendEvent(name: 'triggerMode', value: mode as String)
   def triggerValue = mode == "home/away" ? 3 : (mode == "away" ? 2 : (mode == "home" ? 1 : 0))
   parent.sendHsCommand(id(), "sensor-config", [
     instance: device.getDataValue("sensorInstance") ?: "sensor-1",
@@ -78,7 +79,8 @@ def setTriggerMode(mode) {
 }
 
 def setChirpMode(mode) {
-  log.info "Setting chirp mode to ${mode} for ${device.displayName} (drv v${driverVer()})"
+  log.info "Setting chirp mode to ${mode} for ${device.displayName} (drv v${deviceVer()})"
+  sendEvent(name: 'chirpMode', value: mode as String)
   def chirpValue = mode == "on" ? 1 : 0
   parent.sendHsCommand(id(), "sensor-config", [
     instance: device.getDataValue("sensorInstance") ?: "sensor-1",
@@ -91,7 +93,8 @@ def setChirpMode(mode) {
 }
 
 def setBypassMode(mode) {
-  log.info "Setting bypass mode to ${mode} for ${device.displayName} (drv v${driverVer()})"
+  log.info "Setting bypass mode to ${mode} for ${device.displayName} (drv v${deviceVer()})"
+  sendEvent(name: 'bypassMode', value: mode as String)
   def bypassValue = mode == "on" ? 1 : 0
   parent.sendHsCommand(id(), "sensor-config", [
     instance: device.getDataValue("sensorInstance") ?: "sensor-1",

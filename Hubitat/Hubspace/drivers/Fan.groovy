@@ -13,10 +13,10 @@
  * ====================================================================
  */
 
-String driverVer() { return "0.2.0" }
+String deviceVer() { return "0.2.1" }
 
 metadata {
-  definition(name: "HubSpace Fan", namespace: "neerpatel/hubspace", author: "Neer Patel", version: driverVer()) {
+  definition(name: "HubSpace Fan", namespace: "neerpatel/hubspace", author: "Neer Patel", version: deviceVer()) {
     capability "Initialize"
     capability "Switch"
     capability "FanControl"
@@ -48,7 +48,7 @@ metadata {
     input name: "devicePollSeconds", type: "number", title: "Device refresh interval (sec)", description: "Override app polling for this device", required: false
   }
 }
-def initialize() { log.debug "Initializing HubSpace Fan v${driverVer()}" }
+def initialize() { log.debug "Initializing HubSpace Fan v${deviceVer()}" }
 def updated() {
   try {
     if (settings?.devicePollSeconds) {
@@ -64,17 +64,19 @@ def refresh() {
 }
 
 def on() { 
-  log.info "Turning on ${device.displayName} (drv v${driverVer()})"
+  log.info "Turning on ${device.displayName} (drv v${deviceVer()})"
+  sendEvent(name: "switch", value: "on")
   parent.sendHsCommand(id(), "power", [instance: "fan-power", value: "on"]) 
 }
 
 def off() { 
-  log.info "Turning off ${device.displayName} (drv v${driverVer()})"
+  log.info "Turning off ${device.displayName} (drv v${deviceVer()})"
+  sendEvent(name: "switch", value: "off")
   parent.sendHsCommand(id(), "power", [instance: "fan-power", value: "off"]) 
 }
 
 def setSpeed(speed) {
-  log.info "Setting fan speed to ${speed} for ${device.displayName} (drv v${driverVer()})"
+  log.info "Setting fan speed to ${speed} for ${device.displayName} (drv v${deviceVer()})"
   
   // Determine device's max levels from data value (set by parent app during state updates)
   Integer maxLevels = (device.getDataValue('fanMaxLevels') ?: '6') as Integer
@@ -119,6 +121,24 @@ def setSpeed(speed) {
   String pctStr = String.format('%03d', pct)
   String apiValue = "fan-speed-${maxLevels}-${pctStr}"
 
+  // Optimistic UI update
+  String speedNameForUi
+  switch ((speed instanceof String) ? speed.toLowerCase() : speed) {
+    case 'off': speedNameForUi = 'off'; break
+    case 'low': speedNameForUi = 'low'; break
+    case 'medium-low': speedNameForUi = 'medium-low'; break
+    case 'medium': speedNameForUi = 'medium'; break
+    case 'medium-high': speedNameForUi = 'medium-high'; break
+    case 'high': speedNameForUi = 'high'; break
+    case 'on': speedNameForUi = 'on'; break
+    default:
+      def n = (speed as Integer)
+      if (n <= 33) speedNameForUi = 'low'
+      else if (n <= 66) speedNameForUi = 'medium'
+      else speedNameForUi = 'high'
+  }
+  if (speedNameForUi) { sendEvent(name: 'speed', value: speedNameForUi) }
+
   // Ensure power on then set speed
   if (device.currentValue("switch") != "on") { on() }
   parent.sendHsCommand(id(), "fan-speed", [instance: "fan-speed", value: apiValue])
@@ -134,7 +154,8 @@ def cycleSpeed() {
 
 def setDirection(direction) {
   def d = (direction as String)?.toLowerCase()
-  log.info "Setting fan direction to ${d} for ${device.displayName} (drv v${driverVer()})"
+  log.info "Setting fan direction to ${d} for ${device.displayName} (drv v${deviceVer()})"
+  sendEvent(name: 'direction', value: d)
   // Many HubSpace fans use functionClass 'fan-reverse' with instance 'fan-reverse'
   parent.sendHsCommand(id(), "fan-reverse", [instance: "fan-reverse", value: d])
 }

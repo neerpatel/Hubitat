@@ -12,10 +12,10 @@
  * ====================================================================
  */
 
-String driverVer() { return "0.1.0" }
+String deviceVer() { return "0.1.1" }
 
 metadata {
-  definition(name: "HubSpace Switch", namespace: "neerpatel/hubspace", author: "Neer Patel", version: "0.1.0") {
+  definition(name: "HubSpace Switch", namespace: "neerpatel/hubspace", author: "Neer Patel", version: deviceVer()) {
     capability "Initialize"
     capability "Switch"
     capability "Actuator"
@@ -39,7 +39,7 @@ metadata {
     input name: "devicePollSeconds", type: "number", title: "Device refresh interval (sec)", description: "Override app polling for this device", required: false
   }
 }
-def initialize() { log.debug "Initializing HubSpace Switch v${driverVer()}" }
+def initialize() { log.debug "Initializing HubSpace Switch v${deviceVer()}" }
 def updated() {
   try {
     if (settings?.devicePollSeconds) {
@@ -50,7 +50,7 @@ def updated() {
   } catch (ignored) {}
 }
 def refresh() { parent.pollChild(device) }
-def on()  { log.info "Switch on (drv v${driverVer()}) ${device.displayName}"; parent.sendHsCommand(id(), "power", [value: "on"]) }
-def off() { log.info "Switch off (drv v${driverVer()}) ${device.displayName}"; parent.sendHsCommand(id(), "power", [value: "off"]) }
+def on()  { log.info "Switch on (drv v${deviceVer()}) ${device.displayName}"; sendEvent(name: 'switch', value: 'on'); parent.sendHsCommand(id(), "power", [value: "on"]) }
+def off() { log.info "Switch off (drv v${deviceVer()}) ${device.displayName}"; sendEvent(name: 'switch', value: 'off'); parent.sendHsCommand(id(), "power", [value: "off"]) }
 
 private id() { device.deviceNetworkId - "hubspace-" }

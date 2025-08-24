@@ -12,10 +12,10 @@
  * ====================================================================
  */
 
-String driverVer() { return "0.1.0" }
+String deviceVer() { return "0.1.1" }
 
 metadata {
-  definition(name: "HubSpace Lock", namespace: "neerpatel/hubspace", author: "Neer Patel", version: "0.1.0") {
+  definition(name: "HubSpace Lock", namespace: "neerpatel/hubspace", author: "Neer Patel", version: deviceVer()) {
     capability "Initialize"
     capability "Lock"
     capability "Refresh"
@@ -43,7 +43,7 @@ metadata {
     input name: "devicePollSeconds", type: "number", title: "Device refresh interval (sec)", description: "Override app polling for this device", required: false
   }
 }
-def initialize() { log.debug "Initializing HubSpace Lock v${driverVer()}" }
+def initialize() { log.debug "Initializing HubSpace Lock v${deviceVer()}" }
 def updated() {
   try {
     if (settings?.devicePollSeconds) {
@@ -57,12 +57,14 @@ def updated() {
 def refresh() { parent.pollChild(device) }
 
 def lock() { 
-  log.info "Locking ${device.displayName} (drv v${driverVer()})"
+  log.info "Locking ${device.displayName} (drv v${deviceVer()})"
+  sendEvent(name: 'lock', value: 'locked')
   parent.sendHsCommand(id(), "lock", [value: "locked"]) 
 }
 
 def unlock() { 
-  log.info "Unlocking ${device.displayName} (drv v${driverVer()})"
+  log.info "Unlocking ${device.displayName} (drv v${deviceVer()})"
+  sendEvent(name: 'lock', value: 'unlocked')
   parent.sendHsCommand(id(), "lock", [value: "unlocked"]) 
 }
 

@@ -24,7 +24,7 @@
  */
 
 // Version helper (Kasa-style): include in logs and diagnostics
-String appVersion() { return "0.2.1" }
+String appVersion() { return "0.2.2" }
 
 
 definition(

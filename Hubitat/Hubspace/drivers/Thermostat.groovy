@@ -15,10 +15,10 @@
  * ====================================================================
  */
 
-String driverVer() { return "0.1.0" }
+String deviceVer() { return "0.1.1" }
 
 metadata {
-    definition(name: 'HubSpace Thermostat', namespace: 'neerpatel/hubspace', author: 'Neer Patel', version: '0.1.0') {
+    definition(name: 'HubSpace Thermostat', namespace: 'neerpatel/hubspace', author: 'Neer Patel', version: deviceVer()) {
         capability 'Initialize'
         capability 'Refresh'
         capability 'Thermostat'
@@ -50,7 +50,7 @@ metadata {
         input name: 'devicePollSeconds', type: 'number', title: 'Device refresh interval (sec)', description: 'Override app polling for this device', required: false
     }
 }
-def initialize() { log.debug "Initializing HubSpace Thermostat v${driverVer()}" }
+def initialize() { log.debug "Initializing HubSpace Thermostat v${deviceVer()}" }
 def updated() {
     try {
         if (settings?.devicePollSeconds) {
@@ -63,39 +63,47 @@ def updated() {
 def refresh() { parent.pollChild(device) }
 
 def setHeatingSetpoint(temperature) {
-    log.info "Set heating setpoint ${temperature} (drv v${driverVer()}) for ${device.displayName}"
+    log.info "Set heating setpoint ${temperature} (drv v${deviceVer()}) for ${device.displayName}"
+    sendEvent(name: 'heatingSetpoint', value: (temperature as float))
     parent.sendHsCommand(id(), "temperature", [instance: "heating-target", value: temperature as float])
 }
 
 def setCoolingSetpoint(temperature) {
-    log.info "Set cooling setpoint ${temperature} (drv v${driverVer()}) for ${device.displayName}"
+    log.info "Set cooling setpoint ${temperature} (drv v${deviceVer()}) for ${device.displayName}"
+    sendEvent(name: 'coolingSetpoint', value: (temperature as float))
     parent.sendHsCommand(id(), "temperature", [instance: "cooling-target", value: temperature as float])
 }
 
 def setThermostatMode(mode) {
-    log.info "Set thermostat mode ${mode} (drv v${driverVer()}) for ${device.displayName}"
+    log.info "Set thermostat mode ${mode} (drv v${deviceVer()}) for ${device.displayName}"
+    sendEvent(name: 'thermostatMode', value: mode as String)
     parent.sendHsCommand(id(), "mode", [value: mode])
 }
 
 def setFanMode(fanMode) {
-    log.info "Set fan mode ${fanMode} (drv v${driverVer()}) for ${device.displayName}"
+    log.info "Set fan mode ${fanMode} (drv v${deviceVer()}) for ${device.displayName}"
+    sendEvent(name: 'thermostatFanMode', value: fanMode as String)
     parent.sendHsCommand(id(), "fan-mode", [value: fanMode])
 }
 
 def setTemperatureRange(tempLow, tempHigh) {
-    log.info "Set temp range ${tempLow}-${tempHigh} (drv v${driverVer()}) for ${device.displayName}"
+    log.info "Set temp range ${tempLow}-${tempHigh} (drv v${deviceVer()}) for ${device.displayName}"
+    sendEvent(name: 'heatingSetpoint', value: (tempLow as float))
+    sendEvent(name: 'coolingSetpoint', value: (tempHigh as float))
     parent.sendHsCommand(id(), "temperature", [instance: "auto-heating-target", value: tempLow as float])
     parent.sendHsCommand(id(), "temperature", [instance: "auto-cooling-target", value: tempHigh as float])
 }
 
 // Custom commands for safety temperatures
 def setSafetyMaxTemp(temperature) {
-    log.info "Set safety max temp ${temperature} (drv v${driverVer()}) for ${device.displayName}"
+    log.info "Set safety max temp ${temperature} (drv v${deviceVer()}) for ${device.displayName}"
+    sendEvent(name: 'safetyMaxTemp', value: (temperature as float))
     parent.sendHsCommand(id(), "temperature", [instance: "safety-mode-max-temp", value: temperature as float])
 }
 
 def setSafetyMinTemp(temperature) {
-    log.info "Set safety min temp ${temperature} (drv v${driverVer()}) for ${device.displayName}"
+    log.info "Set safety min temp ${temperature} (drv v${deviceVer()}) for ${device.displayName}"
+    sendEvent(name: 'safetyMinTemp', value: (temperature as float))
     parent.sendHsCommand(id(), "temperature", [instance: "safety-mode-min-temp", value: temperature as float])
 }
 

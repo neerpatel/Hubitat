@@ -13,7 +13,7 @@
  * ====================================================================
  */
 
-String driverVer() { return "0.1.0" }
+String deviceVer() { return "0.1.1" }
 
 metadata {
     definition(name: 'HubSpace Exhaust Fan', namespace: 'neerpatel/hubspace', author: 'Neer Patel', 
@@ -50,7 +50,7 @@ metadata {
         input name: 'devicePollSeconds', type: 'number', title: 'Device refresh interval (sec)', description: 'Override app polling for this device', required: false
     }
 }
-def initialize() { log.debug "Initializing HubSpace Exhaust Fan v${driverVer()}" }
+def initialize() { log.debug "Initializing HubSpace Exhaust Fan v${deviceVer()}" }
 def updated() {
     try {
         if (settings?.devicePollSeconds) {
@@ -64,26 +64,29 @@ def refresh() { parent.pollChild(device) }
 
 // Commands for numbers (e.g., auto-off-timer)
 def setNumber(functionClass, functionInstance, value) {
-    log.info "Set ${functionClass}/${functionInstance} -> ${value} (drv v${driverVer()}) for ${device.displayName}"
+    log.info "Set ${functionClass}/${functionInstance} -> ${value} (drv v${deviceVer()}) for ${device.displayName}"
     parent.sendHsCommand(id(), functionClass, [instance: functionInstance, value: value])
 }
 
 // Commands for selects (e.g., motion-action, sensitivity)
 def setSelect(functionClass, functionInstance, value) {
-    log.info "Set ${functionClass}/${functionInstance} -> ${value} (drv v${driverVer()}) for ${device.displayName}"
+    log.info "Set ${functionClass}/${functionInstance} -> ${value} (drv v${deviceVer()}) for ${device.displayName}"
     parent.sendHsCommand(id(), functionClass, [instance: functionInstance, value: value])
 }
 
 def setAutoOffTimer(seconds) {
     setNumber('auto-off-timer', 'auto-off', seconds as int)
+    sendEvent(name: 'autoOffTimer', value: (seconds as int))
 }
 
 def setMotionAction(action) {
     setSelect('motion-action', 'exhaust-fan', action)
+    sendEvent(name: 'motionAction', value: action as String)
 }
 
 def setHumiditySensitivity(level) {
     setSelect('sensitivity', 'humidity-sensitivity', level)
+    sendEvent(name: 'sensitivity', value: level as String)
 }
 
 private id() { device.deviceNetworkId - 'hubspace-' }
