@@ -36,3 +36,17 @@
   - Expand `processStateValue(...)` for any new function classes to emit Hubitat events.
 - When extending the bridge, add endpoints or controller calls in `bridge.py` and keep responses minimal (`id`, `type`, `name`, `states`).
 - Never log or commit credentials; use app preferences or `/login` only.
+
+## Versioning Guidelines
+
+- Bump versions on every code change that affects behavior or interfaces.
+  - App (`Hubitat/Hubspace/app/HubspaceDeviceManager.groovy`): update `appVersion()`.
+  - Drivers (`Hubitat/Hubspace/drivers/*.groovy`): expose `deviceVer()` and reference it in `metadata { definition(..., version: deviceVer()) }`.
+- Semver scheme for this repo:
+  - Patch: bug fixes, minor mappings or UI copy, telemetry/event adjustments.
+  - Minor: new features, new device types/capabilities, preference additions.
+  - Major: breaking changes to preferences, capabilities, or API expectations.
+- Process:
+  - Increment version in the file(s) you change.
+  - Note the change briefly in PR description with the new version(s).
+  - Keep versions aligned across related updates (e.g., when app and a driver change together).

@@ -24,7 +24,7 @@
  */
 
 // Version helper (Kasa-style): include in logs and diagnostics
-String appVersion() { return "0.2.2" }
+String appVersion() { return "0.2.3" }
 
 
 definition(
@@ -707,7 +707,14 @@ private processStateValue(cd, String functionClass, String functionInstance, val
       // Already handled at caller; ignore to avoid log noise
       break
     case "power":
-      cd.sendEvent(name: "switch", value: value == "on" ? "on" : "off")
+      def onoff = (value == "on") ? "on" : "off"
+      cd.sendEvent(name: "switch", value: onoff)
+      try {
+        def hsType = (cd.getDataValue('hsType') ?: '').toLowerCase()
+        if (hsType == 'valve' || hsType == 'water-timer') {
+          cd.sendEvent(name: 'valve', value: (onoff == 'on') ? 'open' : 'closed')
+        }
+      } catch (ignored) {}
       break
     case "brightness":
       cd.sendEvent(name: "level", value: (value as int))
