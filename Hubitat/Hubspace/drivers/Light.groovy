@@ -14,7 +14,7 @@
  * ====================================================================
  */
 
-String deviceVer() { return "0.1.1" }
+String deviceVer() { return "0.1.2" }
 
 metadata {
   definition(name: "HubSpace Light", namespace: "neerpatel/hubspace", author: "Neer Patel", version: deviceVer()) {
@@ -89,6 +89,11 @@ def setColorTemperature(kelvin) {
 def setColor(value) {
   log.info "Setting color for ${device.displayName} (drv v${deviceVer()}): ${value}"
   // value is a map like [hue:0-99, saturation:0-99, level:0-100]
+  def supports = device.getDataValue('supportsColor') == 'true'
+  if (!supports) {
+    log.warn "${device.displayName} does not report color support; skipping setColor"
+    return
+  }
   def rgb = hubitatColorToRgb(value)
   parent.sendHsCommand(id(), "color-rgb", [value: [r: rgb.r, g: rgb.g, b: rgb.b]])
   

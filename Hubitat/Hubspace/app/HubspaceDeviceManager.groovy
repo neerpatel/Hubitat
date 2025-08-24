@@ -20,11 +20,15 @@
  *  - No credentials are logged. Session ID is shown for diagnostics only.
  *  - Function class mapping/event translation lives in updateFromState/processStateValue.
  *  - Drivers call parent.sendHsCommand to hit the bridge.
- * ====================================================================
+ *
+ *  Credit:
+ *  - Inspired by: https://github.com/jdeath/Hubspace-Homeassistant and https://github.com/Expl0dingBanana/aioafero
+ *  - App structure and device management patterns adapted from: https://github.com/DaveGut/HubitatActive
+ *  ====================================================================
  */
 
 // Version helper (Kasa-style): include in logs and diagnostics
-String appVersion() { return "0.2.3" }
+String appVersion() { return "0.2.4" }
 
 
 definition(
@@ -299,6 +303,10 @@ def pollChild(cd) {
       timeout: 10
     ]) { resp ->
       updateFromState(cd, resp.data)
+      try {
+        if (state.lastPolled == null) state.lastPolled = [:]
+        state.lastPolled[cd.deviceNetworkId] = now()
+      } catch (ignored) {}
     }
   } catch (Exception e) {
     log.warn "Node bridge error polling device ${cd.displayName} (app v${appVersion()}): ${e.message}"
@@ -720,7 +728,17 @@ private processStateValue(cd, String functionClass, String functionInstance, val
       cd.sendEvent(name: "level", value: (value as int))
       break
     case "color-temperature":
-      cd.sendEvent(name: "colorTemperature", value: (value as int))
+      try {
+        Integer ct
+        if (value instanceof Number) {
+          ct = (value as int)
+        } else {
+          def s = (value?.toString() ?: "").trim()
+          def m = (s =~ /(\d{3,5})/)
+          ct = m ? (m[0][1] as int) : null
+        }
+        if (ct != null) { cd.sendEvent(name: "colorTemperature", value: ct) }
+      } catch (ignored) { /* ignore malformed CT */ }
       break
     case "color-mode":
       // Map HubSpace color modes to Hubitat colorMode values
@@ -735,6 +753,7 @@ private processStateValue(cd, String functionClass, String functionInstance, val
         cd.sendEvent(name: "hue", value: hsv.h)
         cd.sendEvent(name: "saturation", value: hsv.s)
       }
+      try { cd.updateDataValue('supportsColor', 'true') } catch (ignored) {}
       break
     case "fan-speed":
       if (functionInstance == "ac-fan-speed") {
@@ -759,7 +778,7 @@ private processStateValue(cd, String functionClass, String functionInstance, val
         // Map percent to Hubitat FanControl speed names
         String speedName = null
         if (maxLevels == null) {
-          speedName = cd.currentValue('speed') ?: 'off'
+          try { speedName = cd?.currentValue('speed') ?: 'off' } catch (ignored) { speedName = 'off' }
         } else if (maxLevels >= 6) {
           if      (percent <= 16) speedName = 'low'
           else if (percent <= 33) speedName = 'medium-low'

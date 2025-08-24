@@ -366,7 +366,7 @@ app.get("/health", (req, res) => {
       status: "ok",
       uptime: process.uptime(),
       sessions: sessions.size,
-      version: "0.1.0",
+      version: appVersion,
     });
   } catch (e) {
     res.status(500).json({ status: "error", error: e.message });
