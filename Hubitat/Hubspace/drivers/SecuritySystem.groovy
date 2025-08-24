@@ -1,0 +1,110 @@
+/*
+ * ====================================================================
+ *  HubSpace Security System (Driver)
+ *
+ *  Capabilities: SecurityKeypad, Alarm, PresenceSensor
+ *  Purpose:
+ *  - Map arming modes to HubSpace 'security-system-mode' values (home, away, night, disarmed).
+ *  - Map Alarm capability to HubSpace 'alarm-status' (off, strobe, siren, both).
+ *  - Versioned logging via driverVer() for diagnostics.
+ *
+ *  Notes:
+ *  - Telemetry attributes (wifi, rssi, etc.) are populated by the parent app.
+ * ====================================================================
+ */
+
+String deviceVer() { return "0.1.1" }
+
+metadata {
+  definition(name: "HubSpace Security System", namespace: "neerpatel/hubspace", author: "Neer Patel", version: deviceVer()) {
+    capability "Initialize"
+    capability "SecurityKeypad"
+    capability "Refresh"
+    capability "PresenceSensor"
+    capability "Alarm"
+    
+    attribute "securitySystemStatus", "enum", ["disarmed", "armed home", "armed away", "armed night"]
+    attribute "alarmStatus", "enum", ["off", "strobe", "siren", "both"]
+
+    // Network/health telemetry surfaced by the app
+    attribute "ssid", "string"
+    attribute "rssi", "number"
+    attribute "wifiState", "string"
+    attribute "wifiSetupState", "string"
+    attribute "wifiMac", "string"
+    attribute "visible", "string"
+    attribute "direct", "string"
+    attribute "healthStatus", "string"
+    attribute "latitude", "number"
+    attribute "longitude", "number"
+    attribute "location", "string"
+    attribute "schedulerFlags", "string"
+    
+    command "armHome"
+    command "armAway"
+    command "armNight"
+    command "disarm"
+    command "setAlarmStatus", [[name:"status", type:"ENUM", constraints:["off", "strobe", "siren", "both"]]]
+    // Standard Alarm capability shortcuts
+    command "siren"
+    command "strobe"
+    command "both"
+    command "off"
+  }
+  preferences {
+    input name: "devicePollSeconds", type: "number", title: "Device refresh interval (sec)", description: "Override app polling for this device", required: false
+  }
+}
+def initialize() { log.debug "Initializing HubSpace Security System v${deviceVer()}" }
+def updated() {
+  try {
+    if (settings?.devicePollSeconds) {
+      device.updateDataValue("devicePollSeconds", String.valueOf((settings.devicePollSeconds as int)))
+    } else {
+      device.removeDataValue("devicePollSeconds")
+    }
+  } catch (ignored) {}
+}
+
+def refresh() { parent.pollChild(device) }
+
+def armHome() {
+  log.info "Arming home for ${device.displayName} (drv v${deviceVer()})"
+  sendEvent(name: 'securitySystemStatus', value: 'armed home')
+  parent.sendHsCommand(id(), "security-system-mode", [value: "home"])
+}
+
+def armAway() {
+  log.info "Arming away for ${device.displayName} (drv v${deviceVer()})"
+  sendEvent(name: 'securitySystemStatus', value: 'armed away')
+  parent.sendHsCommand(id(), "security-system-mode", [value: "away"])
+}
+
+def armNight() {
+  log.info "Arming night for ${device.displayName} (drv v${deviceVer()})"
+  sendEvent(name: 'securitySystemStatus', value: 'armed night')
+  parent.sendHsCommand(id(), "security-system-mode", [value: "night"])
+}
+
+def disarm() {
+  log.info "Disarming ${device.displayName} (drv v${deviceVer()})"
+  sendEvent(name: 'securitySystemStatus', value: 'disarmed')
+  parent.sendHsCommand(id(), "security-system-mode", [value: "disarmed"])
+}
+
+def setAlarmStatus(status) {
+  log.info "Setting alarm status to ${status} for ${device.displayName} (drv v${deviceVer()})"
+  sendEvent(name: 'alarmStatus', value: status as String)
+  sendEvent(name: 'alarm', value: status as String)
+  parent.sendHsCommand(id(), "alarm-status", [value: status])
+}
+
+// Alarm capability implementations
+def siren() { setAlarmStatus('siren') }
+def strobe() { setAlarmStatus('strobe') }
+def both()  { setAlarmStatus('both') }
+def off()   { setAlarmStatus('off') }
+
+private id() { 
+  device.deviceNetworkId - "hubspace-" 
+}

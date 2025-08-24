@@ -1,0 +1,8 @@
+
+node_modules/
+**/KasaDevices/
+Hubitat/Hubspace/app/Hubspace
+.DS_Store
+
+tmp/research
+tmp/scripts
