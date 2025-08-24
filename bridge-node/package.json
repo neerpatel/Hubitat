@@ -1,12 +1,13 @@
 {
   "name": "hubitat-bridge",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "license": "AGPL-3.0",
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js"
   },
   "dependencies": {
+    "app-root-path": "^3.1.0",
     "cheerio": "^1.0.0-rc.12",
     "express": "^4.19.2",
     "node-fetch": "^3.3.2",
