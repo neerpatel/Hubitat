@@ -24,7 +24,7 @@
  */
 
 // Version helper (Kasa-style): include in logs and diagnostics
-String appVersion() { return "0.2.0" }
+String appVersion() { return "0.2.1" }
 
 
 definition(
@@ -402,15 +402,37 @@ def addDevicesPage() {
 
   Map devices = state.devices ?: [:]
   Map uninstalled = [:]
-  // Build a set of child DNIs from parent devices so we only list parents/standalone
-  Set childDnis = [] as Set
+  // Group by physical deviceId when available to identify parent/child sets
+  Map<String, List<Map>> byDevId = [:].withDefault { [] }
   devices.each { String k, Map v ->
-    (v.children ?: []).each { String cid -> childDnis << "hubspace-${cid}" }
+    String devId = (v.deviceId ?: '') as String
+    if (devId) {
+      byDevId[devId] << v
+    }
   }
-  devices.each { String k, Map v ->
-    def child = getChildDevice(k)
-    // Skip if already installed, or if this record is a child of a known parent
-    if (!child && !childDnis.contains(k)) {
+  // Build list of parent/standalone DNIs to show
+  Set<String> showDnis = [] as Set
+  if (byDevId) {
+    byDevId.each { String physId, List<Map> group ->
+      if (group.size() > 1) {
+        // Prefer explicit parent with children; fallback to class 'ceiling-fan'
+        Map parent = group.find { (it.children instanceof List) && it.children.size() > 0 }
+        if (!parent) { parent = group.find { (it.type as String) == 'ceiling-fan' } }
+        if (!parent) { parent = group[0] }
+        showDnis << (parent.dni as String)
+      } else {
+        showDnis << (group[0].dni as String)
+      }
+    }
+  } else {
+    // Fallback to children-based filtering if deviceId not provided
+    Set childDnis = [] as Set
+    devices.each { String k, Map v -> (v.children ?: []).each { String cid -> childDnis << "hubspace-${cid}" } }
+    devices.each { String k, Map v -> if (!childDnis.contains(k)) { showDnis << k } }
+  }
+  showDnis.each { String k ->
+    def v = devices[k]
+    if (v && !getChildDevice(k)) {
       uninstalled[k] = "${v.name ?: v.id}, ${v.type}"
     }
   }
@@ -552,6 +574,17 @@ def addDevices() {
     try {
       List created = []
       List children = (rec.children instanceof List) ? rec.children : []
+      // If children are not present, derive from other metadevices with the same physical deviceId
+      if (!children || children.size() == 0) {
+        String physId = rec.deviceId as String
+        if (physId) {
+          devices.each { String dk, Map dv ->
+            if (dv.deviceId == physId && dv.id != rec.id) {
+              children << (dv.id as String)
+            }
+          }
+        }
+      }
       if (children && children.size() > 0) {
         // Create a Hubitat device for each child metadevice under this parent
         children.each { String cid ->
@@ -598,9 +631,13 @@ def addDevices() {
 def listDevices() {
   log.debug "listDevices"
   Map devices = state.devices ?: [:]
+  // Display only parent/standalone devices for clarity
+  Set<String> childDnis = [] as Set
+  devices.each { String k, Map v -> (v.children ?: []).each { String cid -> childDnis << "hubspace-${cid}" } }
   List lines = []
   devices.keySet().sort().each { String dni ->
     def rec = devices[dni]
+    if (childDnis.contains(dni)) { return }
     def installed = getChildDevice(dni) ? 'Yes' : 'No'
     lines << "<b>${rec.name} - ${rec.type}</b>: [id: ${rec.id}, installed: ${installed}]"
   }
