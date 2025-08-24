@@ -2,7 +2,7 @@
 
 ### Seamless HubSpace Device Integration for Hubitat
 
-![Node.js](https://img.shields.io/badge/Node.js-18+-green) ![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue) ![Hubitat](https://img.shields.io/badge/Hubitat-Compatible-orange) ![License: MIT](https://img.shields.io/badge/License-MIT-yellow)
+![Node.js](https://img.shields.io/badge/Node.js-18+-green) ![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue) ![Hubitat](https://img.shields.io/badge/Hubitat-Compatible-orange) ![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue)
 
 🌟 **Bridge your Hubitat hub with HubSpace cloud devices effortlessly!**  
 Control lights, fans, and smart devices through a secure OAuth proxy that connects your local Hubitat hub with the HubSpace cloud ecosystem.
@@ -319,6 +319,22 @@ We'd love to hear from you!
 - 🔧 **HubSpace specific**: Tag issues with `hubspace` label
 
 ### 🌟 Star this repo if it helped you! 🌟
+
+---
+
+## 📄 License
+
+This project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**.
+
+**What this means:**
+- ✅ **Freedom to use** - Use this software for any purpose
+- ✅ **Freedom to study** - Access and examine the source code
+- ✅ **Freedom to modify** - Make changes and improvements
+- ✅ **Freedom to distribute** - Share copies with others
+- ⚠️ **Copyleft requirement** - Derivative works must also be AGPL-3.0
+- ⚠️ **Network use provision** - If you run this software on a server, you must provide source code to users
+
+For the complete license text, see the [LICENSE](../LICENSE) file in the repository root.
 
 ## Credit
 Additionally, show these projects some love, as I was inspired by their work to make this project : 

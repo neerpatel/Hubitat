@@ -2,7 +2,7 @@
 
 ### Custom Drivers, Apps, and Integrations for Hubitat
 
-![Hubitat](https://img.shields.io/badge/Hubitat-Compatible-orange) ![Groovy](https://img.shields.io/badge/Groovy-Driver-blue) ![TypeScript](https://img.shields.io/badge/TypeScript-Bridge-green) ![License: MIT](https://img.shields.io/badge/License-MIT-yellow)
+![Groovy](https://img.shields.io/badge/Groovy-4298B8?style=for-the-badge&logo=apachegroovy&logoColor=white) [![Node.js](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](https://nodejs.org/) [![Express](https://img.shields.io/badge/Express-000000?style=for-the-badge&logo=express&logoColor=white)](https://expressjs.com/) [![Raspberry Pi](https://img.shields.io/badge/Raspberry%20Pi-A22846?style=for-the-badge&logo=raspberry-pi&logoColor=white)](https://www.raspberrypi.org/) [![Hubitat](https://img.shields.io/badge/Hubitat-00A1C9?style=for-the-badge&logo=smartthings&logoColor=white)](https://hubitat.com/) ![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge)
 
 ![GitHub Stars](https://img.shields.io/github/stars/neerpatel/Hubitat) ![GitHub Issues](https://img.shields.io/github/issues/neerpatel/Hubitat) ![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)
 

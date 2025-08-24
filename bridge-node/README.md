@@ -2,7 +2,7 @@
 
 ### Cloud Device Integration Bridge for Hubitat
 
-![Node.js](https://img.shields.io/badge/Node.js-18+-green) ![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue) ![Express](https://img.shields.io/badge/Express-Server-red) ![PM2](https://img.shields.io/badge/PM2-Production-orange)
+![Node.js](https://img.shields.io/badge/Node.js-18+-green) ![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue) ![Express](https://img.shields.io/badge/Express-Server-red) ![PM2](https://img.shields.io/badge/PM2-Production-orange) ![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue)
 
 🚀 **A minimal, secure Express server that proxies cloud authentication and device control for Hubitat integrations.**
 
@@ -381,7 +381,11 @@ The bridge is designed to support additional cloud providers:
 
 ## 📄 License
 
-MIT License - see repository root for full license details.
+This project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**.
+
+The AGPL-3.0 is a copyleft license that ensures the software remains free and open source. If you run this software on a server and provide it as a service to others, you must also provide the source code.
+
+See the [LICENSE](../LICENSE) file in the repository root for full license details.
 
 ---
 
@@ -481,6 +485,8 @@ curl -sS "$BASE/devices?session=$SESSION" | jq '.'
   - Sending `color-rgb` to CT-only lights → ensure you only send color when the device supports it.
   - Invalid fan-speed value → must be one of the device’s supported category values (e.g., `fan-speed-3-033`).
 
-## License
+## 📄 License
 
-MIT (see repository root for license if applicable)
+AGPL-3.0 License - see repository root for full license details.
+
+This software is free and open source under the GNU Affero General Public License v3.0.
