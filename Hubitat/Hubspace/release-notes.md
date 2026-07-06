@@ -1,5 +1,19 @@
 # Release Notes
 
+## Version 0.2.6 (2026-07-06)
+
+### 🐛 Bug Fixes
+
+- **Updated HubSpace Discovery Inputs**: Device discovery now works with the newer upstream HubSpace payload
+  - Accepts device class and friendly name data from `semantics` and `capabilities` fallback fields
+  - Keeps filtering to real `metadevice.device` entries while ignoring home/room/group containers
+  - Preserves richer raw payload data from the bridge for future device-type handling
+
+### 🔧 Technical Improvements
+
+- **Bridge Payload Compatibility**: Hubitat app discovery now matches the richer metadata returned by the updated Node bridge
+- **Version Bump**: App/package manifest updated to `0.2.6`
+
 ## Version 0.2.5 (2025-08-24)
 
 ### 🐛 Bug Fixes

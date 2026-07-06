@@ -1,52 +1,28 @@
 # Repository Guidelines
 
-## Architecture Overview
-- Hubitat app: `Hubitat/app/Hubspace/HubspaceDeviceManager.groovy` handles HubSpace OAuth/PKCE, discovery, child creation, polling, and command routing via `sendHsCommand`.
-- Device drivers: `Hubitat/drivers/Hubspace/` implement Hubitat capabilities and map attributes/commands to HubSpace function classes (e.g., `power`, `brightness`).
-- Optional bridge: `bridge-app/Hubspace/bridge.py` (FastAPI + `aioafero`) for local REST control and testing.
+## Project Structure & Architecture
 
-## Project Structure
-- `Hubitat/app/Hubspace/`: App code and lifecycle (install, update, discovery).
-- `Hubitat/drivers/Hubspace/`: Drivers like `Light.groovy`, `Switch.groovy`, `Fan.groovy`, `Lock.groovy`, `Thermostat.groovy`, `Valve.groovy`, `SecuritySystem*.groovy`.
-- `bridge-app/Hubspace/bridge.py`: Login, `/devices`, `/state/{id}`, `/command/{id}`.
-- `docs/`: HubSpace/Afero notes and sequence diagrams.
+This repo centers on the HubSpace integration for Hubitat. The Hubitat app lives in `Hubitat/Hubspace/app/HubspaceDeviceManager.groovy` and owns OAuth, discovery, polling, and command routing. Device drivers live in `Hubitat/Hubspace/drivers/` with one Groovy file per device type, for example `Light.groovy`, `Fan.groovy`, and `Thermostat.groovy`. The optional bridge server lives in `bridge-node/` and exposes the cloud proxy used by the Hubitat app. Long-form setup and protocol notes belong in `docs/`, especially `docs/Hubspace.md`.
 
-## Build, Test, and Run
-- Hubitat: Import `.groovy` in Hubitat admin (Apps/Drivers Code). Configure credentials in the app, click “Discover Devices”, verify logs.
-- Python bridge: `python3 -m venv .venv && source .venv/bin/activate && pip install fastapi uvicorn aioafero && uvicorn bridge-app.Hubspace.bridge:app --reload`
-- Quick checks: `curl -X POST localhost:8000/login -H 'Content-Type: application/json' -d '{"username":"u","password":"p"}'` then `curl localhost:8000/devices`.
+## Build, Test, and Development Commands
 
-## Coding Style & Naming
-- Python: PEP 8, 4 spaces, `snake_case`; async endpoints; keep modules under `bridge-app/Hubspace/`.
-- Groovy: 4 spaces; class/file names `UpperCamelCase`; use Hubitat capabilities and command names consistently.
+- `cd bridge-node && npm install`: install bridge dependencies.
+- `cd bridge-node && npm start`: run the bridge with Node.
+- `cd bridge-node && npm run dev`: run the bridge with `nodemon`.
+- `curl http://localhost:3000/health`: quick bridge smoke test.
+- `bash setup.sh`: provision the deployment host and PM2 layout.
+- `bash post-deploy.sh`: refresh bridge dependencies after deploy.
 
-## Testing Guidelines
-- Hubitat: Validate driver events in logs; exercise capabilities (e.g., `on`, `setLevel`, `lock`); include reproduction steps/screens.
-- Python: Add targeted tests under `bridge-app/tests/` when extending; provide curl samples in PRs.
+Hubitat Groovy files are loaded through the Hubitat admin UI, not a local build tool. Import the app/driver code, run discovery, then verify device events in hub logs.
 
-## Commit & PR Guidelines
-- Commits: Imperative subject, concise body; reference issues (e.g., `#123`).
-- PRs: What/why, linked issues, test evidence (logs/curl), and any config notes; keep scope tight.
+## Coding Style & Naming Conventions
 
-## Agent-Specific Instructions
-- Role: Act as an expert Python & Groovy developer to build the Hubitat app and device drivers for HubSpace devices.
-- When adding a new device type:
-  - Create `Hubitat/drivers/Hubspace/<Device>.groovy` with correct `capability`/`command` set. Map commands to HubSpace via `parent.sendHsCommand(device.deviceNetworkId - 'hubspace-', 'power', [value: 'on'])`, `brightness`/`color-temperature`, etc.
-  - Update `driverForType(...)` in the app to return the new driver name.
-  - Expand `processStateValue(...)` for any new function classes to emit Hubitat events.
-- When extending the bridge, add endpoints or controller calls in `bridge.py` and keep responses minimal (`id`, `type`, `name`, `states`).
-- Never log or commit credentials; use app preferences or `/login` only.
+Use 4 spaces in both Groovy and JavaScript. Keep Groovy script-style and Hubitat-native: `UpperCamelCase.groovy` filenames, Hubitat capability names, and helper methods before lifecycle handlers when practical. Use `camelCase` for methods and variables. In the bridge, follow the existing CommonJS and minimal Express style; avoid adding abstraction unless a second caller needs it.
 
-## Versioning Guidelines
+## Testing & Validation
 
-- Bump versions on every code change that affects behavior or interfaces.
-  - App (`Hubitat/Hubspace/app/HubspaceDeviceManager.groovy`): update `appVersion()`.
-  - Drivers (`Hubitat/Hubspace/drivers/*.groovy`): expose `deviceVer()` and reference it in `metadata { definition(..., version: deviceVer()) }`.
-- Semver scheme for this repo:
-  - Patch: bug fixes, minor mappings or UI copy, telemetry/event adjustments.
-  - Minor: new features, new device types/capabilities, preference additions.
-  - Major: breaking changes to preferences, capabilities, or API expectations.
-- Process:
-  - Increment version in the file(s) you change.
-  - Note the change briefly in PR description with the new version(s).
-  - Keep versions aligned across related updates (e.g., when app and a driver change together).
+There is no committed automated test suite yet, so keep validation targeted and reproducible. For Hubitat changes, include manual steps such as `on`, `setLevel`, `lock`, or `setThermostatMode`, plus the observed log output. For bridge changes, verify `/health`, `/devices`, `/state/:id`, and `/command/:id` with `curl`.
+
+## Commits, PRs, and Releases
+
+Follow the repo's existing Conventional Commit pattern: `feat(scope): ...`, `fix(scope): ...`, or `chore: ...`. PRs should explain what changed, why, affected device types, and how you validated it. If behavior changes, bump versions in the touched Groovy files (`appVersion()` or `deviceVer()`), update `Hubitat/Hubspace/packageManifest.json` when needed, and add a new top entry to the matching `release-notes.md`. Never commit credentials or log raw account secrets.

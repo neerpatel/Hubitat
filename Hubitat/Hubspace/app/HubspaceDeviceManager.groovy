@@ -28,7 +28,7 @@
  */
 
 // Version helper (Kasa-style): include in logs and diagnostics
-String appVersion() { return "0.2.5" }
+String appVersion() { return "0.2.6" }
 
 
 definition(
@@ -388,12 +388,8 @@ void refreshIndexAndDiscover() {
     if (typeId && typeId != 'metadevice.device') { return }
 
     String id = (d.id ?: d.deviceId ?: d.metadeviceId ?: d.device_id)?.toString()
-    String type = (
-      d.device_class ?: d?.description?.device?.deviceClass ?: d?.description?.deviceClass
-    )?.toString()?.toLowerCase()
-    String name = (
-      d.friendlyName ?: d.friendly_name ?: d?.description?.device?.friendlyName ?: d.default_name ?: (id ? "HubSpace ${id}" : null)
-    )?.toString()
+    String type = resolveDeviceClass(d)
+    String name = resolveDeviceName(d, id)
     String deviceId = (d.deviceId ?: d.device_id)?.toString()
     List children = []
     try {
@@ -416,6 +412,31 @@ void refreshIndexAndDiscover() {
   }
 
   state.devices = disc
+}
+
+private String resolveDeviceClass(Map d) {
+  return (
+    d.device_class ?:
+    d?.description?.device?.deviceClass ?:
+    d?.description?.deviceClass ?:
+    d?.semantics?.device?.deviceClass ?:
+    d?.semantics?.deviceClass ?:
+    d?.capabilities?.device?.deviceClass ?:
+    d?.capabilities?.deviceClass
+  )?.toString()?.toLowerCase()
+}
+
+private String resolveDeviceName(Map d, String id) {
+  return (
+    d.friendlyName ?:
+    d.friendly_name ?:
+    d?.description?.device?.friendlyName ?:
+    d?.description?.deviceName ?:
+    d?.semantics?.device?.friendlyName ?:
+    d?.semantics?.deviceName ?:
+    d.default_name ?:
+    (id ? "HubSpace ${id}" : null)
+  )?.toString()
 }
 
 // ===== Kasa-style Add Devices Flow (adapted for HubSpace bridge) =====

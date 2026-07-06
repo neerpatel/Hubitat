@@ -19,14 +19,16 @@ const CONFIG = {
   AUTH_REALM: "thd",
   CLIENT_ID: "hubspace_android",
   REDIRECT_URI: "hubspace-app://loginredirect",
-  USER_AGENT: "Dart/3.1 (dart:io)",
+  USER_AGENT:
+    "Mozilla/5.0 (Linux; Android 15; Hubitat Bridge Build/test; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/138.0.7204.63 Mobile Safari/537.36",
+  REQUESTED_WITH: "io.afero.partner.hubspace",
   API_HOST: "api2.afero.net",
   DATA_HOST: "semantics2.afero.net",
   SESSION_CLEANUP_INTERVAL: 60000, // 1 minute
   TOKEN_REFRESH_BUFFER: 5000, // 5 seconds
 };
 
-// In-memory session store: sessionId -> { refresh_token, access_token, expiration, accountId, lastAccess }
+// In-memory session store: sessionId -> { id_token, access_token, refresh_token, expiration, accountId, lastAccess }
 const sessions = new Map();
 
 // Initialize Express app
@@ -71,6 +73,14 @@ async function http(
 ) {
   const resp = await fetch(url, { method, headers, body, redirect });
   return resp;
+}
+
+function defaultHeaders(headers = {}) {
+  return {
+    "User-Agent": CONFIG.USER_AGENT,
+    "accept-encoding": "gzip",
+    ...headers,
+  };
 }
 
 /**
@@ -168,10 +178,9 @@ async function performLogin(username, password) {
   const url =
     getAuthUrl("protocol/openid-connect/auth") + `?${qs.stringify(authParams)}`;
   const getResp = await http("GET", url, {
-    headers: {
-      "User-Agent": CONFIG.USER_AGENT,
+    headers: defaultHeaders({
       Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    },
+    }),
     redirect: "manual",
   });
 
@@ -212,16 +221,22 @@ async function performLogin(username, password) {
   const loginBody = qs.stringify({ username, password, credentialId: "" });
 
   const postResp = await http("POST", `${loginUrl}?${qs.stringify(loginQs)}`, {
-    headers: {
-      "User-Agent": CONFIG.USER_AGENT,
+    headers: defaultHeaders({
       "Content-Type": "application/x-www-form-urlencoded",
+      "x-requested-with": CONFIG.REQUESTED_WITH,
       Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
       Cookie: cookies,
-      Referer: getAuthUrl("protocol/openid-connect/auth"),
-    },
+    }),
     body: loginBody,
     redirect: "manual",
   });
+
+  const loginHtml = await postResp.text();
+  if (postResp.status === 200 && loginHtml.includes("kc-otp-login-form")) {
+    throw new Error(
+      "HubSpace account requires a verification code; OTP login is not supported by this bridge yet"
+    );
+  }
 
   const location = postResp.headers.get("location") || "";
   const code = location.match(/[?&]code=([^&]+)/)?.[1];
@@ -241,12 +256,11 @@ async function performLogin(username, password) {
   });
 
   const tokenResp = await http("POST", tokenUrl, {
-    headers: {
-      "User-Agent": CONFIG.USER_AGENT,
+    headers: defaultHeaders({
       "Content-Type": "application/x-www-form-urlencoded",
       Accept: "application/json",
       Host: CONFIG.AUTH_HOST,
-    },
+    }),
     body: tokenBody,
   });
 
@@ -257,15 +271,15 @@ async function performLogin(username, password) {
     );
   }
 
-  const { access_token, refresh_token, expires_in } = tokenJson;
+  const { id_token, access_token, refresh_token, expires_in } = tokenJson;
   const expiration = Date.now() + (expires_in - 5) * 1000;
 
   // Step 4: Get account ID
   const meResp = await http("GET", getApiUrl("/v1/users/me"), {
-    headers: {
-      Authorization: `Bearer ${access_token}`,
+    headers: defaultHeaders({
+      Authorization: `Bearer ${id_token || access_token}`,
       Host: CONFIG.API_HOST,
-    },
+    }),
   });
 
   const meJson = await meResp.json();
@@ -276,6 +290,7 @@ async function performLogin(username, password) {
   }
 
   return {
+    id_token,
     access_token,
     refresh_token,
     expiration,
@@ -308,12 +323,11 @@ async function refreshIfNeeded(sess) {
   });
 
   const resp = await http("POST", tokenUrl, {
-    headers: {
-      "User-Agent": CONFIG.USER_AGENT,
+    headers: defaultHeaders({
       "Content-Type": "application/x-www-form-urlencoded",
       Accept: "application/json",
       Host: CONFIG.AUTH_HOST,
-    },
+    }),
     body,
   });
 
@@ -322,6 +336,7 @@ async function refreshIfNeeded(sess) {
     throw new Error(`Refresh failed: ${resp.status} ${JSON.stringify(json)}`);
   }
 
+  sess.id_token = json.id_token || sess.id_token;
   sess.access_token = json.access_token;
   sess.refresh_token = json.refresh_token || sess.refresh_token;
   sess.expiration = Date.now() + (json.expires_in - 5) * 1000;
@@ -369,13 +384,13 @@ app.get("/devices", async (req, res) => {
     await refreshIfNeeded(sess);
 
     const url = getApiUrl(
-      `/v1/accounts/${sess.accountId}/metadevices?expansions=state`
+      `/v1/accounts/${sess.accountId}/metadevices?expansions=state,capabilities,semantics`
     );
     const resp = await http("GET", url, {
-      headers: {
-        Authorization: `Bearer ${sess.access_token}`,
+      headers: defaultHeaders({
+        Authorization: `Bearer ${sess.id_token || sess.access_token}`,
         Host: CONFIG.DATA_HOST,
-      },
+      }),
     });
 
     const data = await resp.json();
@@ -399,6 +414,9 @@ app.get("/devices", async (req, res) => {
         d?.description?.device?.friendlyName ||
         d.default_name,
       children: d.children || [],
+      semantics: d.semantics,
+      capabilities: d.capabilities,
+      description: d.description,
       states: d.state || d.states || undefined,
     }));
 
@@ -428,10 +446,10 @@ app.get("/state/:id", async (req, res) => {
       `/v1/accounts/${sess.accountId}/metadevices/${deviceId}/state`
     );
     const resp = await http("GET", url, {
-      headers: {
-        Authorization: `Bearer ${sess.access_token}`,
+      headers: defaultHeaders({
+        Authorization: `Bearer ${sess.id_token || sess.access_token}`,
         Host: CONFIG.DATA_HOST,
-      },
+      }),
     });
 
     logger.info(`[state] device=${deviceId} status=${resp.status}`);
@@ -469,11 +487,11 @@ app.post("/command/:id", async (req, res) => {
     const payload = { metadeviceId: String(deviceId), values };
 
     const resp = await http("PUT", url, {
-      headers: {
-        Authorization: `Bearer ${sess.access_token}`,
+      headers: defaultHeaders({
+        Authorization: `Bearer ${sess.id_token || sess.access_token}`,
         Host: CONFIG.DATA_HOST,
         "Content-Type": "application/json; charset=utf-8",
-      },
+      }),
       body: JSON.stringify(payload),
     });
 
