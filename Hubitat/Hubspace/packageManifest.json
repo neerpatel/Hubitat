@@ -3,9 +3,9 @@
   "author": "Neer Patel",
   "minimumHEVersion": "2.3.4",
   "dateReleased": "2026-07-06",
-  "version": "0.2.6",
+  "version": "0.3.0",
   "licenseFile": "https://raw.githubusercontent.com/joelwetzel/Hubitat-Auto-Shades/master/LICENSE",
-  "releaseNotes": "Updated HubSpace discovery to use the current bridge payload and classify devices from semantics/capabilities.",
+  "releaseNotes": "Moved HubSpace auth, discovery, polling, and commands into the Groovy app so a separate bridge server is no longer required for the primary flow.",
   "communityLink": "https://community.hubitat.com/t/hubspace-integration/156320",
   "documentationLink": "https://github.com/neerpatel/Hubitat/blob/main/docs/Hubspace.md",
   "apps": [
@@ -17,7 +17,7 @@
       "required": true,
       "oauth": false,
       "primary": false,
-      "version": "0.2.6"
+      "version": "0.3.0"
     }
   ],
   "drivers": [

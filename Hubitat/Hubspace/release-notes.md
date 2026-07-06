@@ -1,5 +1,20 @@
 # Release Notes
 
+## Version 0.3.0 (2026-07-06)
+
+### 🎉 New Features
+
+- **Direct Hubitat HubSpace Client**: The Hubitat app now logs into HubSpace directly and no longer requires `bridge-node` for normal discovery, polling, or commands
+  - Replaced bridge URL/session UI with direct HubSpace connect/reconnect status
+  - Moved PKCE login, token refresh, and account lookup into the Groovy app
+  - Kept existing child drivers and command routing intact
+
+### 🔧 Technical Improvements
+
+- **Single-threaded App Execution**: App definition now uses `singleThreaded: true` to reduce auth refresh and polling races
+- **Legacy Bridge Cleanup**: App initialization clears old bridge settings/state so upgrades do not keep stale `nodeBridgeUrl` data
+- **Documentation Refresh**: Setup docs now describe the direct Groovy flow and keep `bridge-node` as a legacy fallback/reference only
+
 ## Version 0.2.6 (2026-07-06)
 
 ### 🐛 Bug Fixes
