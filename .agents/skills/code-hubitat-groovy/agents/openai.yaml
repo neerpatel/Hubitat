@@ -1,0 +1,4 @@
+interface:
+  display_name: "Code Hubitat Groovy"
+  short_description: "Write Hubitat Groovy apps and drivers"
+  default_prompt: "Use $code-hubitat-groovy to write or review Hubitat Groovy app and driver code."

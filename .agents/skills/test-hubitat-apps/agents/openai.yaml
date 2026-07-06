@@ -1,0 +1,4 @@
+interface:
+  display_name: "Test Hubitat Apps"
+  short_description: "Add local and hub-based tests for Hubitat apps"
+  default_prompt: "Use $test-hubitat-apps to add test automation for a Hubitat app or driver."

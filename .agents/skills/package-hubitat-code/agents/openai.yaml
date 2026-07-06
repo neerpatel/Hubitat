@@ -1,0 +1,4 @@
+interface:
+  display_name: "Package Hubitat Code"
+  short_description: "Prepare Hubitat code for release and HPM"
+  default_prompt: "Use $package-hubitat-code to prepare Hubitat apps and drivers for publishing or Hubitat Package Manager."

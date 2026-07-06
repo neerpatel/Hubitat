@@ -1,0 +1,4 @@
+interface:
+  display_name: "Migrate HA to Hubitat"
+  short_description: "Port Home Assistant automations to Hubitat"
+  default_prompt: "Use $migrate-ha-to-hubitat to port a Home Assistant custom app or automation to Hubitat."

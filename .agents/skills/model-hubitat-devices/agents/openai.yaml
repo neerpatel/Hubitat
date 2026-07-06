@@ -1,0 +1,4 @@
+interface:
+  display_name: "Model Hubitat Devices"
+  short_description: "Design Hubitat capabilities and devices"
+  default_prompt: "Use $model-hubitat-devices to design Hubitat device capabilities, attributes, commands, and child devices."
