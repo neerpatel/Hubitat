@@ -5,7 +5,7 @@
  * The app owns HubSpace auth, discovery, polling, and command routing.
  */
 
-String appVersion() { '0.3.0' }
+String appVersion() { '0.3.2' }
 
 definition(
     name: 'HubSpace Device Manager',
@@ -168,13 +168,29 @@ private String extractFromHtml(String html, String pattern) {
     matcher ? matcher[0][1]?.toString() : null
 }
 
+private String logSnippet(String text, int maxLen = 600) {
+    String s = text ?: ''
+    s = s.replace('\n', ' ').replace('\r', ' ').trim()
+    s.length() > maxLen ? s.substring(0, maxLen) : s
+}
+
 private String loginFormAction(String html) {
-    String action = extractFromHtml(html, /(?is)<form\b(?=[^>]*\bid=["']kc-form-login["'])(?=[^>]*\baction=["']([^"']+)["'])[^>]*>/)
+    String action = extractFromHtml(html, /(?is)<form[^>]*id=["']kc-form-login["'][^>]*action=["']([^"']+)["']/)
+    if (!action) {
+        action = extractFromHtml(html, /(?is)<form[^>]*action=["']([^"']+)["'][^>]*id=["']kc-form-login["']/)
+    }
     action?.replace('&amp;', '&')
 }
 
+private String queryParamValue(String url, String key) {
+    String pattern = '(?i)[?&]' + java.util.regex.Pattern.quote(key) + '=([^&]+)'
+    extractFromHtml(url ?: '', pattern)
+}
+
 private String hiddenField(String html, String fieldName) {
-    extractFromHtml(html, /(?is)<input\b(?=[^>]*\bname=["']${java.util.regex.Pattern.quote(fieldName)}["'])(?=[^>]*\bvalue=["']([^"']*)["'])[^>]*>/)
+    String patternA = '(?is)<input[^>]*name=["\']' + java.util.regex.Pattern.quote(fieldName) + '["\'][^>]*value=["\']([^"\']*)["\']'
+    String patternB = '(?is)<input[^>]*value=["\']([^"\']*)["\'][^>]*name=["\']' + java.util.regex.Pattern.quote(fieldName) + '["\']'
+    extractFromHtml(html, patternA) ?: extractFromHtml(html, patternB)
 }
 
 private Map parseCookies(Map headers) {
@@ -293,12 +309,17 @@ private Map hubspaceLogin() {
 
     String loginHtml = authResp.text ?: ''
     Map loginCookies = parseCookies(authResp.headers)
+    log.warn "[HubSpace] login page status=${authResp.status} cookieCount=${loginCookies.values?.size() ?: 0} htmlLength=${loginHtml.length()} headers=${(authResp.headers?.keySet() ?: []).join(',')}"
+    log.warn "[HubSpace] login page snippet=${logSnippet(loginHtml)}"
     String action = loginFormAction(loginHtml)
-    String sessionCode = action?.find(/session_code=[^&]+/) ? extractFromHtml(action, /session_code=([^&]+)/) : hiddenField(loginHtml, 'session_code')
-    String execution = action?.find(/execution=[^&]+/) ? extractFromHtml(action, /execution=([^&]+)/) : hiddenField(loginHtml, 'execution')
-    String tabId = action?.find(/tab_id=[^&]+/) ? extractFromHtml(action, /tab_id=([^&]+)/) : hiddenField(loginHtml, 'tab_id')
+    String sessionCode = queryParamValue(action, 'session_code') ?: hiddenField(loginHtml, 'session_code')
+    String execution = queryParamValue(action, 'execution') ?: hiddenField(loginHtml, 'execution')
+    String tabId = queryParamValue(action, 'tab_id') ?: hiddenField(loginHtml, 'tab_id')
+    log.warn "[HubSpace] parsed login action=${action}"
+    log.warn "[HubSpace] parsed login params sessionCode=${sessionCode ? 'present' : 'missing'} execution=${execution ? 'present' : 'missing'} tabId=${tabId ? 'present' : 'missing'}"
 
     if (!action || !sessionCode || !execution || !tabId) {
+        log.error "[HubSpace] login form parse failed htmlSnippet=${logSnippet(loginHtml)}"
         throw new IllegalStateException('Unable to parse HubSpace login form')
     }
 
