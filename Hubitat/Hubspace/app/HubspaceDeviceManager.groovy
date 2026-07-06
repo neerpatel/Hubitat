@@ -50,16 +50,18 @@ private Map hubspaceDefaultHeaders(Map extra = [:]) {
 }
 
 private Map buildPkcePair() {
-    byte[] bytes = new byte[40]
-    new java.security.SecureRandom().nextBytes(bytes)
-    String verifier = base64UrlEncode(bytes).replaceAll('[^a-zA-Z0-9_-]', '')
+    String verifier = ''
+    while (verifier.length() < 64) {
+        verifier += java.util.UUID.randomUUID().toString().replace('-', '')
+    }
+    verifier = verifier.take(64)
     byte[] digest = java.security.MessageDigest.getInstance('SHA-256').digest(verifier.getBytes('UTF-8'))
     String challenge = base64UrlEncode(digest)
     [verifier: verifier, challenge: challenge]
 }
 
 private String base64UrlEncode(byte[] bytes) {
-    java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
+    bytes.encodeBase64().toString().replace('+', '-').replace('/', '_').replace('=', '')
 }
 
 private String urlEncode(value) {
@@ -95,16 +97,14 @@ private Map collectHeaders(resp) {
     rawSets.each { raw ->
         if (raw instanceof Map) {
             raw.each { k, v -> addHeaderValues(headers, k?.toString(), v) }
-        } else if (raw instanceof Collection || raw?.getClass()?.isArray()) {
+        } else if (raw instanceof Collection) {
             raw.each { h ->
-                String name = null
-                def value = null
-                try { name = h?.name?.toString() } catch (ignored) {}
-                try { if (!name && h?.respondsTo('getName')) name = h.getName()?.toString() } catch (ignored) {}
-                try { value = h?.value } catch (ignored) {}
-                try { if (value == null && h?.respondsTo('getValue')) value = h.getValue() } catch (ignored) {}
-                addHeaderValues(headers, name, value)
+                addHeaderObject(headers, h)
             }
+        } else if (raw instanceof Object[]) {
+            raw.each { h -> addHeaderObject(headers, h) }
+        } else {
+            addHeaderObject(headers, raw)
         }
     }
 
@@ -113,11 +113,23 @@ private Map collectHeaders(resp) {
     }
 }
 
+private void addHeaderObject(Map headers, header) {
+    String name = null
+    def value = null
+    try { name = header?.name?.toString() } catch (ignored) {}
+    try { if (!name && header?.respondsTo('getName')) name = header.getName()?.toString() } catch (ignored) {}
+    try { value = header?.value } catch (ignored) {}
+    try { if (value == null && header?.respondsTo('getValue')) value = header.getValue() } catch (ignored) {}
+    addHeaderValues(headers, name, value)
+}
+
 private void addHeaderValues(Map headers, String name, value) {
     if (!name || value == null) {
         return
     }
-    if (value instanceof Collection || value?.getClass()?.isArray()) {
+    if (value instanceof Collection) {
+        value.each { headers[name] << it?.toString() }
+    } else if (value instanceof Object[]) {
         value.each { headers[name] << it?.toString() }
     } else {
         headers[name] << value.toString()
